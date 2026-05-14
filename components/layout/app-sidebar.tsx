@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   MessageSquareText,
@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Settings,
   Users,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -41,11 +43,13 @@ function NavLink({
   label,
   icon: Icon,
   active,
+  collapsed,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
+  collapsed?: boolean;
 }) {
   const router = useRouter();
   const handleMouseEnter = useCallback(() => {
@@ -60,17 +64,18 @@ function NavLink({
           prefetch={true}
           onMouseEnter={handleMouseEnter}
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+            "flex items-center rounded-lg text-sm transition-colors",
+            collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
             active
               ? "bg-primary text-primary-foreground font-medium shadow-sm"
               : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
           )}
         >
           <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary-foreground")} />
-          <span className="truncate">{label}</span>
+          {!collapsed && <span className="truncate">{label}</span>}
         </Link>
       </TooltipTrigger>
-      <TooltipContent side="right" className="lg:hidden">
+      <TooltipContent side="right" className={collapsed ? "" : "lg:hidden"}>
         {label}
       </TooltipContent>
     </Tooltip>
@@ -79,6 +84,20 @@ function NavLink({
 
 export function AppSidebar({ role = "member", isManager = false }: { role?: MemberRole; isManager?: boolean }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar_collapsed");
+    if (saved === "1") setCollapsed(true);
+  }, []);
+
+  const toggle = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
+      return next;
+    });
+  }, []);
 
   const visibleItems = navItems.filter(
     (item) =>
@@ -87,22 +106,22 @@ export function AppSidebar({ role = "member", isManager = false }: { role?: Memb
   );
 
   return (
-    <aside className="flex h-full w-56 flex-col border-r border-r-primary/15 bg-sidebar">
+    <aside className={cn("flex h-full flex-col border-r border-r-primary/15 bg-sidebar transition-all duration-200", collapsed ? "w-14" : "w-56")}>
       {/* Brand header */}
-      <div className="flex h-14 items-center px-5">
+      <div className={cn("flex h-14 items-center", collapsed ? "justify-center px-2" : "px-5")}>
         <Link
           href="/tasks"
           className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold shrink-0">
             F
           </span>
-          Fynd Studio
+          {!collapsed && <span>Fynd Studio</span>}
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col px-3 pt-2">
+      <nav className={cn("flex flex-1 flex-col pt-2", collapsed ? "px-1.5" : "px-3")}>
         <div className="flex flex-col gap-1">
           {visibleItems.map((item) => (
             <NavLink
@@ -111,6 +130,7 @@ export function AppSidebar({ role = "member", isManager = false }: { role?: Memb
               label={item.label}
               icon={item.icon}
               active={pathname.startsWith(item.href)}
+              collapsed={collapsed}
             />
           ))}
         </div>
@@ -123,7 +143,18 @@ export function AppSidebar({ role = "member", isManager = false }: { role?: Memb
             label="Settings"
             icon={Settings}
             active={pathname.startsWith("/settings")}
+            collapsed={collapsed}
           />
+          <button
+            onClick={toggle}
+            className={cn(
+              "flex items-center rounded-lg text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors mt-1 w-full",
+              collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+            )}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            {!collapsed && <span className="text-xs">Collapse</span>}
+          </button>
         </div>
       </nav>
     </aside>

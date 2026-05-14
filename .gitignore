@@ -9,3 +9,10 @@ ui-main
 # OS
 .DS_Store
 *.DS_Store
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# GCP credentials
+gcp-credentials.json
+*.credentials.json

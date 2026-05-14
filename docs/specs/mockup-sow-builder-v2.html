@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fynd Studio · SoW Builder · Expert Mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+  .nav-active { color: #059669; border-bottom: 2px solid #059669; font-weight: 600; }
+  .nav-item { color: #64748b; border-bottom: 2px solid transparent; }
+  .nav-item:hover { color: #334155; }
+  .step-header { background: #0f172a; color: white; padding: 8px 16px; font-size: 12px; font-weight: 700; }
+  .svc-chip { transition: all 0.15s; cursor: pointer; user-select: none; }
+  .svc-chip:hover { border-color: #059669; }
+  .svc-chip.active { border-color: #059669; background: #ecfdf5; }
+  .tier-card { transition: all 0.15s; cursor: pointer; position: relative; }
+  .tier-card:hover { border-color: #059669; }
+  .tier-card.active { border-color: #059669; background: #ecfdf5; box-shadow: 0 0 0 1px #059669; }
+  /* P10: Checkmark badge on active tier card */
+  .tier-card.active::after {
+    content: '\2713';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    background: #059669;
+    color: white;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .plan-tab { padding: 8px 16px; font-size: 12px; font-weight: 600; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
+  .plan-tab:hover { color: #0f172a; }
+  .plan-tab.active { color: #059669; border-bottom-color: #059669; }
+  .stab { flex: 1; padding: 10px; font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; text-align: center; border-bottom: 3px solid #e2e8f0; transition: all 0.15s; }
+  .stab:hover { color: #059669; }
+  .stab.active { color: #059669; border-bottom-color: #059669; background: #ecfdf5; }
+  .guardrail-bar { background: linear-gradient(to right, #dc2626 0% 25%, #f59e0b 25% 50%, #84cc16 50% 75%, #15803d 75% 100%); }
+  .del-qty { width: 56px; height: 28px; padding: 0 6px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; background: white; color: #059669; font-weight: 700; }
+  .del-qty:focus { outline: 2px solid #059669; outline-offset: -1px; }
+  .ali-row { display: grid; grid-template-columns: 2.2fr 0.6fr 0.8fr 80px 1fr 40px; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+  .ali-row:hover { background: #f8fafc; }
+  .preview-line { display: grid; grid-template-columns: 1fr 50px 90px 100px; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 11px; align-items: center; }
+
+  /* P5: Focus indicators */
+  *:focus-visible { outline: 2px solid #059669; outline-offset: 2px; }
+
+  /* P3/P19: Print stylesheet */
+  @media print {
+    .no-print { display: none !important; }
+    .print-area { display: block !important; }
+    /* Hide the modal sticky header bar when printing */
+    .sow-modal-header { display: none !important; }
+    /* Make the modal content fill the page */
+    #sowModal { position: static !important; background: none !important; padding: 0 !important; }
+    #sowModal > div { max-height: none !important; overflow: visible !important; box-shadow: none !important; border-radius: 0 !important; }
+    @page { size: A4; margin: 14mm; }
+  }
+  .print-area { display: none; }
+
+  /* P15: Unsaved indicator dot */
+  .unsaved-dot {
+    display: none;
+    width: 6px;
+    height: 6px;
+    background: #f59e0b;
+    border-radius: 9999px;
+  }
+  .unsaved-dot.visible { display: inline-block; }
+
+  /* P12: Validation styles */
+  .field-error { border-color: #ef4444 !important; }
+  .discount-warning { color: #d97706; font-size: 10px; margin-top: 2px; display: none; }
+  .discount-warning.visible { display: block; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Shell -->
+<div class="flex min-h-screen">
+  <!-- Sidebar -->
+  <aside class="w-16 bg-slate-900 flex flex-col items-center py-4 gap-6 shrink-0 no-print" aria-label="Main navigation">
+    <button class="w-9 h-9 rounded-lg bg-emerald-400 flex items-center justify-center text-slate-900 font-extrabold text-sm" aria-label="Fynd Studio home" tabindex="0">F</button>
+    <nav class="flex flex-col gap-4 mt-4" aria-label="Sidebar navigation">
+      <button class="w-8 h-8 rounded flex items-center justify-center text-slate-500" aria-label="Dashboard" tabindex="0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded flex items-center justify-center text-slate-500" aria-label="Projects" tabindex="0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded flex items-center justify-center text-emerald-400 border-l-2 border-emerald-400 bg-emerald-400/10" aria-label="Finance (current)" aria-current="page" tabindex="0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded flex items-center justify-center text-slate-500" aria-label="Messages" tabindex="0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded flex items-center justify-center text-slate-500" aria-label="Team" tabindex="0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
+      </button>
+    </nav>
+  </aside>
+
+  <main class="flex-1 overflow-hidden flex flex-col no-print">
+    <!-- Top bar -->
+    <div class="h-12 border-b bg-white px-6 flex items-center justify-between shrink-0">
+      <h1 class="text-base font-semibold text-slate-900">Finance</h1>
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-[11px] font-bold text-emerald-700" aria-label="User: TP">TP</div>
+      </div>
+    </div>
+
+    <!-- Finance tabs (P1: role="tablist") -->
+    <div class="bg-white border-b px-6 flex gap-0 shrink-0" role="tablist" aria-label="Finance sections">
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Overview</button>
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Invoices</button>
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Expenses</button>
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Purchase Orders</button>
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Projects</button>
+      <button class="px-4 py-2.5 text-sm nav-item" role="tab" aria-selected="false" tabindex="-1">Rate Card</button>
+      <button class="px-4 py-2.5 text-sm nav-active" role="tab" aria-selected="true" tabindex="0">SoW Builder</button>
+    </div>
+
+    <!-- P7: Breadcrumb -->
+    <nav class="bg-white border-b px-6 py-1.5 text-[11px] text-slate-500 shrink-0" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-1">
+        <li><a href="#" class="hover:text-slate-700">Finance</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="#" class="hover:text-slate-700">SoW Builder</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page" class="text-slate-900 font-semibold">New SoW</li>
+      </ol>
+    </nav>
+
+    <!-- SoW Builder: 2-column layout -->
+    <div class="flex-1 flex overflow-hidden">
+
+      <!-- ========== LEFT: CONFIG PANEL ========== -->
+      <div class="flex-1 overflow-y-auto p-5 space-y-4 border-r bg-slate-50/50" id="configPanel">
+
+        <!-- Step 1: Customer (P13: aria-label for step) -->
+        <div class="bg-white rounded-lg border overflow-hidden" aria-label="Step 1 of 5: Customer">
+          <div class="step-header flex items-center justify-between">
+            <span>1 &middot; Customer</span>
+            <span class="text-[11px] font-normal opacity-70">Linked to Clients module</span>
+          </div>
+          <div class="p-4 grid grid-cols-2 gap-3">
+            <div>
+              <label for="clientSelect" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Client <span class="text-red-500" aria-label="required">*</span></label>
+              <select id="clientSelect" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" onchange="updatePreview(); validateClient();" onblur="validateClient()">
+                <option value="">Search or create client...</option>
+                <option value="greenleaf" selected>GreenLeaf Organics</option>
+                <option value="bluewave">BlueWave Tech</option>
+                <option value="spice">Spice Junction</option>
+                <option value="new">+ Create new client</option>
+              </select>
+            </div>
+            <div>
+              <label for="brandName" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Brand name</label>
+              <input id="brandName" type="text" value="GreenLeaf" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" oninput="updatePreview(); markUnsaved();">
+            </div>
+            <div>
+              <label for="buyerName" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Buyer (CMO / Performance lead) <span class="text-red-500" aria-label="required">*</span></label>
+              <input id="buyerName" type="text" value="Priya Sharma, CMO" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" oninput="markUnsaved();">
+            </div>
+            <div>
+              <label for="salesDRI" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sales DRI (Fynd) <span class="text-red-500" aria-label="required">*</span></label>
+              <input id="salesDRI" type="text" value="Deepak N. · Pod A" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" oninput="markUnsaved();">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Market -->
+        <div class="bg-white rounded-lg border overflow-hidden" aria-label="Step 2 of 5: Market">
+          <div class="step-header">2 &middot; Market</div>
+          <div class="p-4 grid grid-cols-2 gap-3">
+            <div>
+              <label for="tierSelect" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Region / Tier <span class="text-red-500" aria-label="required">*</span></label>
+              <select id="tierSelect" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" onchange="onTierChange()">
+                <option value="india" data-mult="1" data-curr="INR" data-sym="&#8377;" selected>India + Reliance</option>
+                <option value="mea_t1" data-mult="4" data-curr="USD" data-sym="$">MEA T1 · UAE + GCC</option>
+                <option value="mea_t2" data-mult="3.5" data-curr="USD" data-sym="$">MEA T2 · Saudi Arabia</option>
+                <option value="mea_t3" data-mult="1.8" data-curr="USD" data-sym="$">MEA T3 · Africa + Levant</option>
+                <option value="sea_t1" data-mult="4.5" data-curr="USD" data-sym="$">SEA T1 · Singapore</option>
+                <option value="sea_t2" data-mult="2.4" data-curr="USD" data-sym="$">SEA T2 · MY + TH</option>
+                <option value="sea_t3" data-mult="1.8" data-curr="USD" data-sym="$">SEA T3 · ID + PH + VN</option>
+                <option value="row_t1" data-mult="6.5" data-curr="USD" data-sym="$">ROW T1 · US + CA + AU</option>
+                <option value="row_t2" data-mult="5.5" data-curr="USD" data-sym="$">ROW T2 · UK + IE</option>
+                <option value="row_t3" data-mult="5" data-curr="USD" data-sym="$">ROW T3 · Continental Europe</option>
+              </select>
+            </div>
+            <div>
+              <label for="countrySelect" class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Country</label>
+              <select id="countrySelect" class="mt-1 h-9 w-full border rounded-md px-3 text-sm">
+                <option selected>India</option>
+              </select>
+            </div>
+            <div class="col-span-2 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-md flex items-center gap-4 text-sm" aria-live="polite" aria-label="Currency and multiplier display">
+              <span class="text-slate-600 font-semibold">Currency:</span>
+              <span class="font-bold text-emerald-700" id="currDisplay">INR (&#8377;)</span>
+              <span class="text-slate-300" aria-hidden="true">&middot;</span>
+              <span class="text-slate-600">Multiplier:</span>
+              <span class="font-bold text-emerald-700" id="multDisplay">1.0&times;</span>
+              <span class="text-slate-300" aria-hidden="true">&middot;</span>
+              <span class="text-slate-600">FX:</span>
+              <span class="font-bold text-emerald-700">&#8377;83 / $1</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Services -->
+        <div class="bg-white rounded-lg border overflow-hidden" aria-label="Step 3 of 5: Services">
+          <div class="step-header">3 &middot; Services</div>
+          <div class="p-4">
+            <div class="text-[11px] text-slate-500 mb-3">Pick one or both. When both are selected, 10% bundle discount is auto-applied on the smaller line.</div>
+            <div class="flex gap-3">
+              <!-- P1/P11: Service chips as checkboxes with aria-checked -->
+              <div class="svc-chip active flex-1 px-4 py-3 border-2 rounded-lg flex items-center gap-3" id="chip-gm" role="checkbox" aria-checked="true" tabindex="0" onclick="toggleService('gm')" onkeydown="handleChipKey(event, 'gm')">
+                <div class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white text-xs font-bold" id="check-gm" aria-hidden="true">&#10003;</div>
+                <div>
+                  <div class="text-[11px] text-slate-500 uppercase font-semibold">Line of business</div>
+                  <div class="text-sm font-bold text-slate-900">Gen Media</div>
+                  <div class="text-[11px] text-slate-500">AI-native production · per-asset / retainer / pilot</div>
+                </div>
+              </div>
+              <div class="svc-chip flex-1 px-4 py-3 border-2 border-slate-200 rounded-lg flex items-center gap-3" id="chip-mk" role="checkbox" aria-checked="false" tabindex="0" onclick="toggleService('mk')" onkeydown="handleChipKey(event, 'mk')">
+                <div class="w-5 h-5 rounded border-2 border-slate-300" id="check-mk" aria-hidden="true"></div>
+                <div>
+                  <div class="text-[11px] text-slate-500 uppercase font-semibold">Line of business</div>
+                  <div class="text-sm font-bold text-slate-900">Marketing</div>
+                  <div class="text-[11px] text-slate-500">Brand + performance · retainer / per-campaign</div>
+                </div>
+              </div>
+            </div>
+            <div id="bundleNote" class="mt-3 bg-amber-50 border border-amber-300 px-3 py-2 rounded text-[11px] text-amber-800 hidden" aria-live="polite">
+              <strong>Bundle active:</strong> 10% discount auto-applied on the smaller of Gen Media or Marketing line — per v12 bundle rule.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Configure Plan -->
+        <div class="bg-white rounded-lg border overflow-hidden" aria-label="Step 4 of 5: Configure plan">
+          <div class="step-header flex items-center justify-between">
+            <span>4 &middot; Configure plan</span>
+            <span class="text-[11px] font-normal opacity-70" id="configMeta">Gen Media · Volume Retainer · Professional</span>
+          </div>
+
+          <!-- Service tab switcher (P1: role="tablist") -->
+          <div id="serviceTabs" class="flex bg-white hidden" role="tablist" aria-label="Service switcher">
+            <div class="stab active" data-stab="gm" role="tab" aria-selected="true" tabindex="0" onclick="switchServiceTab('gm')" onkeydown="handleTabKey(event, 'stab', 'gm')">Gen Media</div>
+            <div class="stab" data-stab="mk" role="tab" aria-selected="false" tabindex="-1" onclick="switchServiceTab('mk')" onkeydown="handleTabKey(event, 'stab', 'mk')">Marketing</div>
+          </div>
+
+          <!-- Plan type tabs: Gen Media (P1: role="tablist") -->
+          <div id="gmPlanTabs" class="px-3 pt-3 flex gap-1 border-b" role="tablist" aria-label="Gen Media plan types">
+            <div class="plan-tab active" role="tab" aria-selected="true" tabindex="0" onclick="switchPlanType('gm','volume', this)" onkeydown="handlePlanTabKey(event, 'gm', 'volume', this)">Volume Retainer</div>
+            <div class="plan-tab" role="tab" aria-selected="false" tabindex="-1" onclick="switchPlanType('gm','alacarte', this)" onkeydown="handlePlanTabKey(event, 'gm', 'alacarte', this)">A la carte</div>
+            <div class="plan-tab" role="tab" aria-selected="false" tabindex="-1" onclick="switchPlanType('gm','pilot', this)" onkeydown="handlePlanTabKey(event, 'gm', 'pilot', this)">14 Day Pilot</div>
+          </div>
+
+          <!-- Plan type tabs: Marketing (P1: role="tablist") -->
+          <div id="mkPlanTabs" class="px-3 pt-3 flex gap-1 border-b hidden" role="tablist" aria-label="Marketing plan types">
+            <div class="plan-tab active" role="tab" aria-selected="true" tabindex="0" onclick="switchPlanType('mk','brand', this)" onkeydown="handlePlanTabKey(event, 'mk', 'brand', this)">Brand Retainer</div>
+            <div class="plan-tab" role="tab" aria-selected="false" tabindex="-1" onclick="switchPlanType('mk','campaign', this)" onkeydown="handlePlanTabKey(event, 'mk', 'campaign', this)">Per-Campaign</div>
+            <div class="plan-tab" role="tab" aria-selected="false" tabindex="-1" onclick="switchPlanType('mk','strategic', this)" onkeydown="handlePlanTabKey(event, 'mk', 'strategic', this)">Strategic Projects</div>
+          </div>
+
+          <!-- === GM: Volume Retainer === -->
+          <div id="body-gm-volume" class="p-4" role="tabpanel">
+            <!-- P1: Tier cards as radiogroup -->
+            <div class="grid grid-cols-3 gap-3 mb-4" role="radiogroup" aria-label="Gen Media Volume tier selection">
+              <div class="tier-card border-2 rounded-lg p-3" role="radio" aria-checked="false" tabindex="0" onclick="selectTier(this,'starter')" onkeydown="handleTierKey(event, this, 'starter')">
+                <div class="text-xs font-bold text-slate-900">Starter</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1" id="price-starter">&#8377;75,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <div class="text-[11px] text-slate-500 italic mt-1">72 hrs first delivery</div>
+              </div>
+              <div class="tier-card active border-2 rounded-lg p-3" role="radio" aria-checked="true" tabindex="0" onclick="selectTier(this,'pro')" onkeydown="handleTierKey(event, this, 'pro')">
+                <div class="text-xs font-bold text-slate-900">Professional</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1" id="price-pro">&#8377;2,50,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <div class="text-[11px] text-slate-500 italic mt-1">48 hrs locked</div>
+              </div>
+              <div class="tier-card border-2 rounded-lg p-3" role="radio" aria-checked="false" tabindex="0" onclick="selectTier(this,'enterprise')" onkeydown="handleTierKey(event, this, 'enterprise')">
+                <div class="text-xs font-bold text-slate-900">Enterprise</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1" id="price-ent">&#8377;8,00,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <div class="text-[11px] text-slate-500 italic mt-1">24 hrs locked</div>
+              </div>
+            </div>
+
+            <!-- Editable deliverables -->
+            <div class="bg-slate-50 rounded-lg p-3">
+              <div class="text-[11px] font-bold text-slate-500 uppercase mb-2">Deliverables · Professional</div>
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <label for="del-shortform" class="flex-1 text-slate-700">Short-form videos (&le;15s)</label>
+                  <input id="del-shortform" type="number" class="del-qty" value="40" onchange="updatePreview(); markUnsaved();">
+                  <span class="text-[11px] text-slate-500 w-10">/ mo</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <label for="del-brandfilms" class="flex-1 text-slate-700">Brand films (30s)</label>
+                  <input id="del-brandfilms" type="number" class="del-qty" value="3" onchange="updatePreview(); markUnsaved();">
+                  <span class="text-[11px] text-slate-500 w-10">/ mo</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <label for="del-hero" class="flex-1 text-slate-700">Cinematic hero</label>
+                  <input id="del-hero" type="number" class="del-qty" value="1" onchange="updatePreview(); markUnsaved();">
+                  <span class="text-[11px] text-slate-500 w-10">/ mo</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <span class="flex-1 text-slate-700">Carousel / banner packs</span>
+                  <span class="text-[11px] text-emerald-700 font-semibold">Unlimited</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <label for="del-localisation" class="flex-1 text-slate-700">Localisation languages</label>
+                  <input id="del-localisation" type="number" class="del-qty" value="6" onchange="updatePreview(); markUnsaved();">
+                  <span class="text-[11px] text-slate-500 w-10">lang</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-emerald-600 font-bold" aria-hidden="true">&bull;</span>
+                  <span class="flex-1 text-slate-700">Pod DRI</span>
+                  <span class="text-[11px] text-emerald-700 font-semibold">Dedicated</span>
+                </div>
+              </div>
+              <button class="mt-3 text-[11px] text-emerald-700 font-semibold hover:underline h-8">+ Add format from rate card</button>
+            </div>
+          </div>
+
+          <!-- === GM: A La Carte === -->
+          <div id="body-gm-alacarte" class="p-4 hidden" role="tabpanel">
+            <div class="text-[11px] text-slate-500 mb-3">Select formats and quantities. Prices from active rate card v7.</div>
+            <div class="bg-white border rounded-lg overflow-hidden">
+              <div class="ali-row bg-slate-50 font-semibold text-[11px] text-slate-500 uppercase">
+                <div>Format</div><div class="text-center">Length</div><div class="text-right">Unit price</div><div class="text-center">Qty</div><div class="text-right">Line total</div><div></div>
+              </div>
+              <div class="ali-row">
+                <div class="font-medium text-slate-900"><label for="alc-qty-img">Marketing image</label><div class="text-[11px] text-slate-500">24 hrs SLA</div></div>
+                <div class="text-center text-slate-500">static</div>
+                <div class="text-right font-semibold text-emerald-700">&#8377;1,000</div>
+                <div class="text-center"><input id="alc-qty-img" type="number" class="del-qty" value="10" onchange="calcAlacarteTotal(); markUnsaved();"></div>
+                <div class="text-right font-bold text-slate-900 alc-line">&#8377;10,000</div>
+                <div class="text-center"><button class="text-slate-300 hover:text-red-500 w-8 h-8 flex items-center justify-center" aria-label="Remove Marketing image row">&times;</button></div>
+              </div>
+              <div class="ali-row">
+                <div class="font-medium text-slate-900"><label for="alc-qty-spot">Social spot (15s)</label><div class="text-[11px] text-slate-500">48 hrs SLA</div></div>
+                <div class="text-center text-slate-500">15s</div>
+                <div class="text-right font-semibold text-emerald-700">&#8377;22,500</div>
+                <div class="text-center"><input id="alc-qty-spot" type="number" class="del-qty" value="4" onchange="calcAlacarteTotal(); markUnsaved();"></div>
+                <div class="text-right font-bold text-slate-900 alc-line">&#8377;90,000</div>
+                <div class="text-center"><button class="text-slate-300 hover:text-red-500 w-8 h-8 flex items-center justify-center" aria-label="Remove Social spot row">&times;</button></div>
+              </div>
+              <div class="ali-row">
+                <div class="font-medium text-slate-900"><label for="alc-qty-film">Brand film (30s)</label><div class="text-[11px] text-slate-500">5 days SLA</div></div>
+                <div class="text-center text-slate-500">30s</div>
+                <div class="text-right font-semibold text-emerald-700">&#8377;71,000</div>
+                <div class="text-center"><input id="alc-qty-film" type="number" class="del-qty" value="1" onchange="calcAlacarteTotal(); markUnsaved();"></div>
+                <div class="text-right font-bold text-slate-900 alc-line">&#8377;71,000</div>
+                <div class="text-center"><button class="text-slate-300 hover:text-red-500 w-8 h-8 flex items-center justify-center" aria-label="Remove Brand film row">&times;</button></div>
+              </div>
+              <div class="ali-row">
+                <div class="font-medium text-slate-900"><label for="alc-qty-carousel">Carousel pack (5 frames)</label><div class="text-[11px] text-slate-500">24 hrs SLA</div></div>
+                <div class="text-center text-slate-500">static</div>
+                <div class="text-right font-semibold text-emerald-700">&#8377;4,000</div>
+                <div class="text-center"><input id="alc-qty-carousel" type="number" class="del-qty" value="5" onchange="calcAlacarteTotal(); markUnsaved();"></div>
+                <div class="text-right font-bold text-slate-900 alc-line">&#8377;20,000</div>
+                <div class="text-center"><button class="text-slate-300 hover:text-red-500 w-8 h-8 flex items-center justify-center" aria-label="Remove Carousel pack row">&times;</button></div>
+              </div>
+            </div>
+            <button class="mt-2 text-[11px] text-emerald-700 font-semibold hover:underline h-8">+ Add format from rate card</button>
+            <div class="mt-3 flex justify-end">
+              <div class="text-right">
+                <div class="text-[11px] text-slate-500">Subtotal</div>
+                <div class="text-lg font-extrabold text-slate-900" id="alcTotal">&#8377;1,91,000</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- === GM: Pilot === -->
+          <div id="body-gm-pilot" class="p-4 hidden" role="tabpanel">
+            <div class="border-2 border-emerald-400 bg-emerald-50 rounded-lg p-4">
+              <div class="text-sm font-bold text-slate-900">14 Day Pilot Sprint</div>
+              <div class="text-xl font-extrabold text-emerald-700 mt-1">&#8377;4,00,000</div>
+              <div class="text-[11px] text-slate-500 mt-1">Floor: &#8377;2,40,000 · If pilot misses customer baseline, customer pays ~&#8377;50K direct cost only</div>
+              <ul class="mt-3 space-y-1 text-xs text-slate-600">
+                <li>&bull; 1 short-form campaign vs customer baseline</li>
+                <li>&bull; 14 day window, brief-to-delivery</li>
+                <li>&bull; 60% retainer-conversion target</li>
+                <li>&bull; Full production quality — not a "test"</li>
+              </ul>
+              <div class="mt-3 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-[11px] text-amber-700">
+                <strong>Sales playbook:</strong> Use as a wedge when customer won't commit to retainer. 60% convert to Professional or higher within 60 days.
+              </div>
+            </div>
+          </div>
+
+          <!-- === MK: Brand Retainer === -->
+          <div id="body-mk-brand" class="p-4 hidden" role="tabpanel">
+            <div class="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Marketing Brand tier selection">
+              <div class="tier-card border-2 rounded-lg p-3" role="radio" aria-checked="false" tabindex="0" onclick="selectTier(this,'mk-starter')" onkeydown="handleTierKey(event, this, 'mk-starter')">
+                <div class="text-xs font-bold text-slate-900">Starter</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1">&#8377;2,00,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <ul class="mt-2 space-y-0.5 text-[11px] text-slate-600">
+                  <li>&bull; Brand-world training (one-time)</li>
+                  <li>&bull; Named Creative Director</li>
+                  <li>&bull; 1 hero film / qtr</li>
+                  <li>&bull; 2 campaigns / qtr</li>
+                  <li>&bull; 14-day creative cycle</li>
+                </ul>
+              </div>
+              <div class="tier-card border-2 rounded-lg p-3" role="radio" aria-checked="false" tabindex="0" onclick="selectTier(this,'mk-pro')" onkeydown="handleTierKey(event, this, 'mk-pro')">
+                <div class="text-xs font-bold text-slate-900">Professional</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1">&#8377;6,00,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <ul class="mt-2 space-y-0.5 text-[11px] text-slate-600">
+                  <li>&bull; All Starter benefits</li>
+                  <li>&bull; 2 hero films / qtr</li>
+                  <li>&bull; 6 campaigns / qtr</li>
+                  <li>&bull; Brand strategist embed</li>
+                  <li>&bull; Cohort A/B testing</li>
+                  <li>&bull; 6-language localisation</li>
+                </ul>
+              </div>
+              <div class="tier-card border-2 rounded-lg p-3" role="radio" aria-checked="false" tabindex="0" onclick="selectTier(this,'mk-enterprise')" onkeydown="handleTierKey(event, this, 'mk-enterprise')">
+                <div class="text-xs font-bold text-slate-900">Enterprise</div>
+                <div class="text-lg font-extrabold text-emerald-700 mt-1">&#8377;15,00,000<span class="text-[11px] font-normal text-slate-500"> /mo</span></div>
+                <ul class="mt-2 space-y-0.5 text-[11px] text-slate-600">
+                  <li>&bull; All Professional benefits</li>
+                  <li>&bull; Unlimited hero (FUP)</li>
+                  <li>&bull; 12-language</li>
+                  <li>&bull; Dedicated pod (5 people)</li>
+                  <li>&bull; Quarterly brand audit</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- === MK: Per-Campaign === -->
+          <div id="body-mk-campaign" class="p-4 hidden" role="tabpanel">
+            <div class="text-[11px] text-slate-500 mb-3">Add campaigns on top of retainer or standalone. Price ranges — final scoped per brief.</div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="camp-hero">Hero Film</label></div><div class="text-[11px] text-slate-500">Cinematic 60-90s · character-centric · multi-cut · 10-14 days</div></div>
+                <div class="text-right"><div class="text-xs font-bold text-emerald-700">&#8377;4,00,000 — &#8377;12,00,000</div><div class="text-[11px] text-slate-500">+25% per language</div></div>
+                <input id="camp-hero" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="camp-360">Integrated 360 Campaign</label></div><div class="text-[11px] text-slate-500">Big idea + film + digital + OOH + social · 14-21 days</div></div>
+                <div class="text-right"><div class="text-xs font-bold text-emerald-700">&#8377;8,00,000 — &#8377;25,00,000</div><div class="text-[11px] text-slate-500">+20% per language</div></div>
+                <input id="camp-360" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="camp-festive">Festive / Seasonal</label></div><div class="text-[11px] text-slate-500">Diwali / Valentine / IPL · multi-asset, 12-lang ready · 14-21 days</div></div>
+                <div class="text-right"><div class="text-xs font-bold text-emerald-700">&#8377;6,00,000 — &#8377;18,00,000</div><div class="text-[11px] text-slate-500">+25% per language</div></div>
+                <input id="camp-festive" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="camp-launch">Brand Launch</label></div><div class="text-[11px] text-slate-500">Identity + film + 3-mo content kit + go-live · 21-30 days</div></div>
+                <div class="text-right"><div class="text-xs font-bold text-emerald-700">&#8377;15,00,000 — &#8377;40,00,000</div><div class="text-[11px] text-slate-500">+25% per language</div></div>
+                <input id="camp-launch" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="camp-social">Always-on Social (quarterly)</label></div><div class="text-[11px] text-slate-500">12-week: weekly assets + community hooks + reactive moments</div></div>
+                <div class="text-right"><div class="text-xs font-bold text-emerald-700">&#8377;4,00,000 — &#8377;10,00,000 /qtr</div><div class="text-[11px] text-slate-500">+20% per language</div></div>
+                <input id="camp-social" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+            </div>
+          </div>
+
+          <!-- === MK: Strategic === -->
+          <div id="body-mk-strategic" class="p-4 hidden" role="tabpanel">
+            <div class="text-[11px] text-slate-500 mb-3">One-off strategic projects. Fixed pricing.</div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="strat-brand-world">Brand World Training</label></div><div class="text-[11px] text-slate-500">Train StudioOS on the brand: corpus, voice, visual world · 7-14 days</div><div class="text-[11px] text-emerald-600 font-medium">Free for retainer customers</div></div>
+                <div class="text-xs font-bold text-emerald-700">&#8377;3,00,000</div>
+                <input id="strat-brand-world" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="strat-strategy">Brand Strategy Sprint</label></div><div class="text-[11px] text-slate-500">4-week sprint: positioning, message house, creative platform</div></div>
+                <div class="text-xs font-bold text-emerald-700">&#8377;8,00,000</div>
+                <input id="strat-strategy" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="strat-annual">Annual Brand Plan</label></div><div class="text-[11px] text-slate-500">Full FY plan: calendar, budgets, KPIs, hero ideas, channel mix · 6 weeks</div></div>
+                <div class="text-xs font-bold text-emerald-700">&#8377;12,00,000</div>
+                <input id="strat-annual" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+              <div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50">
+                <div class="flex-1"><div class="text-xs font-semibold text-slate-900"><label for="strat-masterclass">AI x Creative · 1-Hour Masterclass</label></div><div class="text-[11px] text-slate-500">Executive session on AI reshaping creative workflows</div></div>
+                <div class="text-xs font-bold text-emerald-700">&#8377;4,00,000</div>
+                <input id="strat-masterclass" type="number" class="del-qty" value="0" min="0" onchange="markUnsaved();">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: Commercials -->
+        <div class="bg-white rounded-lg border overflow-hidden" aria-label="Step 5 of 5: Commercials and Negotiation guardrails">
+          <div class="step-header">5 &middot; Commercials &amp; Negotiation guardrails</div>
+          <div class="p-4 space-y-4">
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label for="discount" class="text-[11px] font-semibold text-slate-500 uppercase">Discount % <span class="text-red-500" aria-label="required">*</span></label>
+                <input id="discount" type="number" min="0" max="50" value="10" step="0.5" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" onchange="updatePreview(); validateDiscount(); markUnsaved();" oninput="validateDiscount();">
+                <div id="discountWarning" class="discount-warning" role="alert">Warning: Discount exceeds 30%. Requires VP approval.</div>
+              </div>
+              <div>
+                <label for="upfront" class="text-[11px] font-semibold text-slate-500 uppercase">Upfront commitment</label>
+                <select id="upfront" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" onchange="updatePreview(); markUnsaved();">
+                  <option value="0">Monthly (Net-15)</option>
+                  <option value="5" selected>Quarterly upfront (5% off)</option>
+                  <option value="10">Annual upfront (10% off)</option>
+                </select>
+              </div>
+              <div>
+                <label for="months" class="text-[11px] font-semibold text-slate-500 uppercase">Months committed <span class="text-red-500" aria-label="required">*</span></label>
+                <input id="months" type="number" min="1" max="36" value="12" step="1" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" onchange="updatePreview(); markUnsaved();">
+              </div>
+            </div>
+
+            <!-- Guardrail bar (P9: zone labels inside the bar) -->
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="text-slate-600 font-semibold">Negotiation position</span>
+                <span class="font-bold text-emerald-700" id="discountTotal">14.5% total</span>
+              </div>
+              <div class="guardrail-bar h-9 rounded-lg relative flex" aria-label="Negotiation guardrail position indicator">
+                <!-- P9: Zone labels inside the colored bar -->
+                <div class="flex-1 flex items-center justify-center text-[10px] font-bold text-white/90 select-none">Walk-away</div>
+                <div class="flex-1 flex items-center justify-center text-[10px] font-bold text-white/90 select-none">Floor</div>
+                <div class="flex-1 flex items-center justify-center text-[10px] font-bold text-white/90 select-none">Manager</div>
+                <div class="flex-1 flex items-center justify-center text-[10px] font-bold text-white/90 select-none">List</div>
+                <div class="absolute top-[-6px] bottom-[-6px] w-1 bg-slate-900 rounded" id="gbarIndicator" style="left: 64%; box-shadow: 0 0 0 2px white;" aria-hidden="true">
+                  <div class="absolute top-[-8px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[6px] border-transparent border-t-slate-900"></div>
+                </div>
+              </div>
+              <div class="flex text-[11px] text-slate-500 font-semibold mt-1">
+                <div class="flex-1 text-center">Below floor<br><span class="text-slate-500">walk-away</span></div>
+                <div class="flex-1 text-center">Floor<br><span class="text-slate-500">25-30%</span></div>
+                <div class="flex-1 text-center">Manager band<br><span class="text-slate-500">10-20%</span></div>
+                <div class="flex-1 text-center">List<br><span class="text-slate-500">0-10%</span></div>
+              </div>
+            </div>
+
+            <!-- Authority status (P3: aria-live) -->
+            <div id="authStatus" class="bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 text-xs text-emerald-700" aria-live="polite">
+              <strong>Manager approval band.</strong> Discount + upfront commitment = 14.5%. Within Pod DRI sign-off authority.
+            </div>
+
+            <!-- Surcharges (P18: aria-label) -->
+            <div class="border-t pt-3" aria-label="Surcharges that cannot be discounted">
+              <div class="text-[11px] font-bold text-slate-500 uppercase mb-2">Surcharges (not discountable)</div>
+              <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                <div class="flex justify-between bg-slate-50 rounded px-2 py-1.5"><span>Same-day rush (&lt;12 hr)</span><span class="font-semibold text-red-600">+30%</span></div>
+                <div class="flex justify-between bg-slate-50 rounded px-2 py-1.5"><span>Scope change after storyboard</span><span class="font-semibold text-red-600">+50%</span></div>
+                <div class="flex justify-between bg-slate-50 rounded px-2 py-1.5"><span>Brief change after delivery</span><span class="font-semibold text-red-600">+100%</span></div>
+                <div class="flex justify-between bg-slate-50 rounded px-2 py-1.5"><span>Talent / music licensing</span><span class="font-semibold text-amber-600">cost +15%</span></div>
+                <div class="flex justify-between bg-slate-50 rounded px-2 py-1.5"><span>Language pack (per lang beyond included)</span><span class="font-semibold text-amber-600">+25%</span></div>
+              </div>
+            </div>
+
+            <!-- Reverse lookup -->
+            <div class="border-t pt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label for="targetPrice" class="text-[11px] font-semibold text-slate-500 uppercase">Customer's target price (optional)</label>
+                <input id="targetPrice" type="number" min="0" step="1000" placeholder="What does the customer want to pay?" class="mt-1 h-9 w-full border rounded-md px-3 text-sm" oninput="markUnsaved();">
+              </div>
+              <div>
+                <label for="impliedDiscount" class="text-[11px] font-semibold text-slate-500 uppercase">Implied discount</label>
+                <div id="impliedDiscount" class="mt-1 h-9 flex items-center px-3 bg-slate-100 rounded-md text-sm font-bold text-emerald-700" aria-live="polite">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions (P15: unsaved indicator, P16: min h-8 touch targets) -->
+        <div class="flex gap-3 justify-end pb-6">
+          <button id="saveDraftBtn" class="h-10 px-5 text-sm font-semibold border rounded-md bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+            Save Draft
+            <span id="unsavedDot" class="unsaved-dot" aria-label="Unsaved changes"></span>
+          </button>
+          <button id="generateBtn" class="h-10 px-5 text-sm font-semibold rounded-md bg-emerald-500 text-white hover:bg-emerald-600" onclick="handleGenerateSoW()">Generate Statement of Work &rarr;</button>
+        </div>
+      </div>
+
+      <!-- ========== RIGHT: LIVE PREVIEW (P1/P3: role="region", aria-live) ========== -->
+      <div class="w-[420px] shrink-0 bg-white flex flex-col overflow-hidden" role="region" aria-label="Live preview" aria-live="polite">
+        <div class="bg-slate-900 text-white px-4 py-2.5 text-xs font-bold flex items-center justify-between shrink-0">
+          <span>Live preview</span>
+          <span class="font-normal opacity-70" id="previewMarket">India · INR · 1.0&times;</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="previewBody">
+          <!-- Customer -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-1">Customer</div>
+            <div class="text-sm font-semibold text-slate-900" id="prevClient">GreenLeaf Organics</div>
+            <div class="text-[11px] text-slate-500">Priya Sharma, CMO · Deepak N. · Pod A</div>
+          </div>
+
+          <!-- Scope -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-2">Scope · Gen Media · Volume Retainer · Professional</div>
+            <div class="bg-slate-50 rounded-lg overflow-hidden border">
+              <div class="preview-line bg-slate-100 font-semibold text-[11px] text-slate-500 px-3">
+                <div>Deliverable</div><div class="text-center">Qty</div><div class="text-right">Unit</div><div class="text-right">Value</div>
+              </div>
+              <div class="preview-line px-3"><div class="text-slate-700">Short-form (&le;15s)</div><div class="text-center text-slate-500">40</div><div class="text-right text-slate-500">/ mo</div><div class="text-right font-semibold text-slate-900">included</div></div>
+              <div class="preview-line px-3"><div class="text-slate-700">Brand films (30s)</div><div class="text-center text-slate-500">3</div><div class="text-right text-slate-500">/ mo</div><div class="text-right font-semibold text-slate-900">included</div></div>
+              <div class="preview-line px-3"><div class="text-slate-700">Cinematic hero</div><div class="text-center text-slate-500">1</div><div class="text-right text-slate-500">/ mo</div><div class="text-right font-semibold text-slate-900">included</div></div>
+              <div class="preview-line px-3"><div class="text-slate-700">Carousel / banner</div><div class="text-center text-slate-500">&infin;</div><div class="text-right text-slate-500">/ mo</div><div class="text-right font-semibold text-slate-900">included</div></div>
+              <div class="preview-line px-3"><div class="text-slate-700">Localisation</div><div class="text-center text-slate-500">6</div><div class="text-right text-slate-500">lang</div><div class="text-right font-semibold text-slate-900">included</div></div>
+              <div class="preview-line px-3"><div class="text-slate-700">Pod DRI</div><div class="text-center text-slate-500">—</div><div class="text-right text-slate-500"></div><div class="text-right font-semibold text-emerald-600">Dedicated</div></div>
+            </div>
+          </div>
+
+          <!-- Commercials -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-2">Commercials</div>
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs"><span class="text-slate-600">List price</span><span class="font-semibold text-slate-900">&#8377;2,50,000 /mo</span></div>
+              <div class="flex justify-between text-xs"><span class="text-slate-600">Discount (10%)</span><span class="text-red-600">&minus;&#8377;25,000</span></div>
+              <div class="flex justify-between text-xs"><span class="text-slate-600">Quarterly upfront (5%)</span><span class="text-red-600">&minus;&#8377;11,250</span></div>
+              <div class="border-t pt-2 mt-2">
+                <div class="flex justify-between text-sm font-bold"><span class="text-slate-900">Net monthly</span><span class="text-emerald-700">&#8377;2,13,750</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment schedule -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-2">Payment schedule · 12 months · Quarterly upfront</div>
+            <div class="bg-slate-50 rounded-lg border overflow-hidden">
+              <div class="grid grid-cols-4 text-center text-[11px] font-semibold text-slate-500 bg-slate-100 py-1.5">
+                <div>Q1</div><div>Q2</div><div>Q3</div><div>Q4</div>
+              </div>
+              <div class="grid grid-cols-4 text-center text-xs font-bold text-slate-900 py-2">
+                <div>&#8377;6,41,250</div><div>&#8377;6,41,250</div><div>&#8377;6,41,250</div><div>&#8377;6,41,250</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total summary -->
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <div class="text-[11px] text-emerald-600 font-semibold">Annual contract value</div>
+                <div class="text-xl font-extrabold text-emerald-800">&#8377;25,65,000</div>
+              </div>
+              <div>
+                <div class="text-[11px] text-emerald-600 font-semibold">Effective monthly</div>
+                <div class="text-xl font-extrabold text-emerald-800">&#8377;2,13,750</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 mt-2 pt-2 border-t border-emerald-200">
+              <div class="text-[11px] text-emerald-700">
+                <span class="font-semibold">Total discount:</span> 14.5% off list
+                <span class="mx-1">&middot;</span>
+                <span class="font-semibold">Savings:</span> &#8377;4,35,000 /yr
+                <span class="mx-1">&middot;</span>
+                <span class="font-semibold">Rate card:</span> v7
+              </div>
+            </div>
+          </div>
+
+          <!-- SLA summary -->
+          <div>
+            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-2">SLA summary</div>
+            <div class="space-y-1 text-[11px] text-slate-600">
+              <div class="flex justify-between"><span>First delivery</span><span class="font-semibold">48 hrs</span></div>
+              <div class="flex justify-between"><span>Revision turnaround</span><span class="font-semibold">24 hrs</span></div>
+              <div class="flex justify-between"><span>Monthly review call</span><span class="font-semibold">Included</span></div>
+              <div class="flex justify-between"><span>Pod DRI response</span><span class="font-semibold">Same business day</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview footer -->
+        <div class="border-t px-4 py-3 bg-slate-50 shrink-0 flex gap-2">
+          <button class="flex-1 h-9 text-xs font-semibold border rounded-md bg-white text-slate-700 hover:bg-slate-100">Export PDF</button>
+          <button class="flex-1 h-9 text-xs font-semibold rounded-md bg-emerald-500 text-white hover:bg-emerald-600" onclick="showSoWPreview()">Preview SoW Document</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ========== SOW DOCUMENT PREVIEW (Modal) (P1/P6: role="dialog", focus trap) ========== -->
+<div id="sowModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 hidden no-print" role="dialog" aria-modal="true" aria-labelledby="sowModalTitle">
+  <div class="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" id="sowModalContent">
+    <!-- P19: sow-modal-header class for print hiding -->
+    <div class="sticky top-0 bg-white border-b px-6 py-3 flex items-center justify-between z-10 sow-modal-header">
+      <div class="text-sm font-bold text-slate-900" id="sowModalTitle">SoW Document Preview</div>
+      <div class="flex items-center gap-2">
+        <button class="h-8 px-3 text-xs font-semibold border rounded-md bg-white text-slate-700 hover:bg-slate-50" aria-label="Print or save as PDF">Print / Save PDF</button>
+        <button class="h-8 px-3 text-xs font-semibold rounded-md bg-emerald-500 text-white hover:bg-emerald-600">Save as Draft</button>
+        <button id="sowModalClose" onclick="closeSoWModal()" class="text-slate-400 hover:text-slate-600 text-lg ml-2 w-8 h-8 flex items-center justify-center" aria-label="Close SoW preview">&times;</button>
+      </div>
+    </div>
+    <div class="p-8">
+      <!-- SoW Header -->
+      <div class="flex items-start justify-between border-b-2 border-slate-900 pb-4 mb-6">
+        <div>
+          <div class="text-3xl font-black text-slate-900">FYND STUDIO</div>
+          <div class="text-xs text-slate-500 mt-1">AI-native creative · Mumbai · Bangalore · Dubai</div>
+        </div>
+        <div class="text-right">
+          <div class="text-lg font-bold text-emerald-700">GreenLeaf Organics</div>
+          <div class="text-xs text-slate-500">GreenLeaf</div>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <div class="text-2xl font-bold text-slate-900">Statement of Work</div>
+        <div class="text-sm text-slate-500 mt-1">Ref: FS-SOW-2026-005 · Effective: 15 May 2026 · Term: 12 months</div>
+      </div>
+
+      <!-- Parties table -->
+      <table class="w-full mb-6 text-sm border">
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 w-1/4 text-slate-700 border">Service Provider</td><td class="py-2 px-3 border">Fynd Studio · a division of Shopsense Retail Technologies Ltd.</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Customer</td><td class="py-2 px-3 border">GreenLeaf Organics</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Buyer</td><td class="py-2 px-3 border">Priya Sharma, CMO</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Sales DRI (Fynd)</td><td class="py-2 px-3 border">Deepak N. · Pod A</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Market / Tier</td><td class="py-2 px-3 border">India + Reliance · INR</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Services</td><td class="py-2 px-3 border">Gen Media · Volume Retainer · Professional</td></tr>
+        <tr><td class="bg-slate-100 font-semibold py-2 px-3 text-slate-700 border">Term</td><td class="py-2 px-3 border">12 months from effective date</td></tr>
+      </table>
+
+      <!-- Scope -->
+      <h3 class="text-lg font-bold text-slate-900 mb-3">1 · Scope &amp; Deliverables</h3>
+      <table class="w-full mb-6 text-sm border">
+        <thead><tr class="bg-slate-100"><th class="py-2 px-3 text-left border font-semibold text-slate-700">Deliverable</th><th class="py-2 px-3 text-center border font-semibold text-slate-700 w-20">Qty</th><th class="py-2 px-3 text-center border font-semibold text-slate-700 w-20">Unit</th><th class="py-2 px-3 text-right border font-semibold text-slate-700 w-24">SLA</th></tr></thead>
+        <tbody>
+          <tr><td class="py-1.5 px-3 border">Short-form videos (&le;15s)</td><td class="py-1.5 px-3 text-center border">40</td><td class="py-1.5 px-3 text-center border">/ mo</td><td class="py-1.5 px-3 text-right border">48 hrs</td></tr>
+          <tr><td class="py-1.5 px-3 border">Brand films (30s)</td><td class="py-1.5 px-3 text-center border">3</td><td class="py-1.5 px-3 text-center border">/ mo</td><td class="py-1.5 px-3 text-right border">5 days</td></tr>
+          <tr><td class="py-1.5 px-3 border">Cinematic hero film</td><td class="py-1.5 px-3 text-center border">1</td><td class="py-1.5 px-3 text-center border">/ mo</td><td class="py-1.5 px-3 text-right border">10 days</td></tr>
+          <tr><td class="py-1.5 px-3 border">Carousel / banner packs</td><td class="py-1.5 px-3 text-center border">Unlimited</td><td class="py-1.5 px-3 text-center border">/ mo</td><td class="py-1.5 px-3 text-right border">24 hrs</td></tr>
+          <tr><td class="py-1.5 px-3 border">Localisation languages</td><td class="py-1.5 px-3 text-center border">6</td><td class="py-1.5 px-3 text-center border">lang</td><td class="py-1.5 px-3 text-right border">+24 hrs</td></tr>
+          <tr><td class="py-1.5 px-3 border">Pod DRI</td><td class="py-1.5 px-3 text-center border">Dedicated</td><td class="py-1.5 px-3 text-center border">—</td><td class="py-1.5 px-3 text-right border">Same day</td></tr>
+        </tbody>
+      </table>
+
+      <!-- Commercials -->
+      <h3 class="text-lg font-bold text-slate-900 mb-3">2 · Commercials</h3>
+      <table class="w-full mb-3 text-sm border">
+        <tr><td class="py-1.5 px-3 border text-slate-600">List price</td><td class="py-1.5 px-3 border text-right font-semibold">&#8377;2,50,000 /mo</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Negotiated discount (10%)</td><td class="py-1.5 px-3 border text-right text-red-600">&minus;&#8377;25,000</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Quarterly upfront commitment (5%)</td><td class="py-1.5 px-3 border text-right text-red-600">&minus;&#8377;11,250</td></tr>
+        <tr class="bg-emerald-50"><td class="py-2 px-3 border font-bold text-emerald-800">Net monthly retainer</td><td class="py-2 px-3 border text-right font-bold text-emerald-800 text-lg">&#8377;2,13,750</td></tr>
+      </table>
+      <table class="w-full mb-6 text-sm border">
+        <thead><tr class="bg-slate-100"><th class="py-2 px-3 text-center border font-semibold text-slate-700">Q1</th><th class="py-2 px-3 text-center border font-semibold text-slate-700">Q2</th><th class="py-2 px-3 text-center border font-semibold text-slate-700">Q3</th><th class="py-2 px-3 text-center border font-semibold text-slate-700">Q4</th><th class="py-2 px-3 text-center border font-semibold text-emerald-700 bg-emerald-50">Annual</th></tr></thead>
+        <tr><td class="py-2 px-3 text-center border font-semibold">&#8377;6,41,250</td><td class="py-2 px-3 text-center border font-semibold">&#8377;6,41,250</td><td class="py-2 px-3 text-center border font-semibold">&#8377;6,41,250</td><td class="py-2 px-3 text-center border font-semibold">&#8377;6,41,250</td><td class="py-2 px-3 text-center border font-bold text-emerald-700 bg-emerald-50 text-lg">&#8377;25,65,000</td></tr>
+      </table>
+
+      <!-- SLAs -->
+      <h3 class="text-lg font-bold text-slate-900 mb-3">3 · Service Level Agreements</h3>
+      <table class="w-full mb-6 text-sm border">
+        <tr><td class="py-1.5 px-3 border text-slate-600">First delivery</td><td class="py-1.5 px-3 border font-semibold">48 hours from brief lock</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Revision turnaround</td><td class="py-1.5 px-3 border font-semibold">24 hours</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Monthly review</td><td class="py-1.5 px-3 border font-semibold">Included — Pod DRI + account lead</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Pod DRI response</td><td class="py-1.5 px-3 border font-semibold">Same business day</td></tr>
+        <tr><td class="py-1.5 px-3 border text-slate-600">Escalation</td><td class="py-1.5 px-3 border font-semibold">Account lead within 4 hours</td></tr>
+      </table>
+
+      <!-- Surcharges -->
+      <h3 class="text-lg font-bold text-slate-900 mb-3">4 · Surcharges &amp; Standard Terms</h3>
+      <ul class="list-disc pl-5 space-y-1 text-sm text-slate-700 mb-6">
+        <li>Same-day rush (&lt;12 hr SLA): <strong>+30%</strong> on list. Not discountable.</li>
+        <li>Scope change after storyboard approval: up to <strong>+50%</strong> of asset cost.</li>
+        <li>Major brief change after delivery: up to <strong>+100%</strong> of asset cost.</li>
+        <li>Talent / branded music licensing: pass-through at <strong>cost +15%</strong> admin.</li>
+        <li>Additional language packs: <strong>+25%</strong> of base per language beyond included.</li>
+        <li>Payment: Net-15 retainers · Net-30 a la carte · 5% off quarterly · 10% off annual.</li>
+      </ul>
+
+      <!-- Signatures -->
+      <h3 class="text-lg font-bold text-slate-900 mb-4">5 · Signatures</h3>
+      <div class="grid grid-cols-2 gap-8">
+        <div>
+          <div class="border-b-2 border-slate-400 h-16 mb-2"></div>
+          <div class="font-semibold text-sm">Fynd Studio</div>
+          <div class="text-xs text-slate-500">Debajit Sardar · Founder</div>
+        </div>
+        <div>
+          <div class="border-b-2 border-slate-400 h-16 mb-2"></div>
+          <div class="font-semibold text-sm">GreenLeaf Organics</div>
+          <div class="text-xs text-slate-500">Authorised representative</div>
+        </div>
+      </div>
+
+      <div class="text-[11px] text-slate-500 mt-8 pt-4 border-t">
+        Internal reference · This SoW is governed by the Fynd Studio Master Services Agreement.
+        Pricing derived from Rate Card FY 2026-27 (v7) · SoW Builder v2. Floor / walk-away logic per v12 Business Plan &sect;8.4.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { gm: true, mk: false, activeService: 'gm', gmPlan: 'volume', mkPlan: 'brand', unsaved: false };
+
+// Track which button triggered the modal for focus restore (P6)
+let modalTriggerEl = null;
+
+function toggleService(svc) {
+  state[svc] = !state[svc];
+  const chip = document.getElementById('chip-' + svc);
+  const check = document.getElementById('check-' + svc);
+  if (state[svc]) {
+    chip.classList.add('active');
+    chip.setAttribute('aria-checked', 'true');
+    check.classList.add('border-emerald-500', 'bg-emerald-500');
+    check.classList.remove('border-slate-300');
+    check.textContent = '✓';
+  } else {
+    chip.classList.remove('active');
+    chip.setAttribute('aria-checked', 'false');
+    check.classList.remove('border-emerald-500', 'bg-emerald-500');
+    check.classList.add('border-slate-300');
+    check.textContent = '';
+  }
+  document.getElementById('bundleNote').classList.toggle('hidden', !(state.gm && state.mk));
+  document.getElementById('serviceTabs').classList.toggle('hidden', !(state.gm && state.mk));
+  if (state.gm && !state.mk) switchServiceTab('gm');
+  if (!state.gm && state.mk) switchServiceTab('mk');
+  markUnsaved();
+  updatePreview();
+}
+
+// P4: Keyboard handler for service chips (Enter/Space)
+function handleChipKey(e, svc) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleService(svc);
+  }
+}
+
+function switchServiceTab(svc) {
+  state.activeService = svc;
+  document.querySelectorAll('[data-stab]').forEach(t => {
+    const isActive = t.dataset.stab === svc;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    t.setAttribute('tabindex', isActive ? '0' : '-1');
+  });
+  document.getElementById('gmPlanTabs').classList.toggle('hidden', svc !== 'gm');
+  document.getElementById('mkPlanTabs').classList.toggle('hidden', svc !== 'mk');
+  hideAllBodies();
+  if (svc === 'gm') showBody('gm-' + state.gmPlan);
+  if (svc === 'mk') showBody('mk-' + state.mkPlan);
+}
+
+// P4: Keyboard handler for service switcher tabs
+function handleTabKey(e, tabType, svc) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    switchServiceTab(svc);
+  }
+  // Arrow key navigation
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const tabs = Array.from(e.target.parentElement.querySelectorAll('[role="tab"]'));
+    const idx = tabs.indexOf(e.target);
+    let nextIdx;
+    if (e.key === 'ArrowRight') nextIdx = (idx + 1) % tabs.length;
+    else nextIdx = (idx - 1 + tabs.length) % tabs.length;
+    tabs[nextIdx].focus();
+    tabs[nextIdx].click();
+  }
+}
+
+function switchPlanType(svc, plan, tab) {
+  if (svc === 'gm') state.gmPlan = plan;
+  if (svc === 'mk') state.mkPlan = plan;
+  tab.parentElement.querySelectorAll('.plan-tab').forEach(t => {
+    const isActive = t === tab;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    t.setAttribute('tabindex', isActive ? '0' : '-1');
+  });
+  hideAllBodies();
+  showBody(svc + '-' + plan);
+  markUnsaved();
+  updatePreview();
+}
+
+// P4: Keyboard handler for plan type tabs
+function handlePlanTabKey(e, svc, plan, tab) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    switchPlanType(svc, plan, tab);
+  }
+  // Arrow key navigation
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const tabs = Array.from(tab.parentElement.querySelectorAll('[role="tab"]'));
+    const idx = tabs.indexOf(tab);
+    let nextIdx;
+    if (e.key === 'ArrowRight') nextIdx = (idx + 1) % tabs.length;
+    else nextIdx = (idx - 1 + tabs.length) % tabs.length;
+    tabs[nextIdx].focus();
+    tabs[nextIdx].click();
+  }
+}
+
+function hideAllBodies() {
+  document.querySelectorAll('[id^="body-"]').forEach(b => b.classList.add('hidden'));
+}
+function showBody(id) {
+  const el = document.getElementById('body-' + id);
+  if (el) el.classList.remove('hidden');
+}
+
+function selectTier(card, tier) {
+  const group = card.parentElement;
+  group.querySelectorAll('.tier-card').forEach(c => {
+    c.classList.remove('active');
+    c.setAttribute('aria-checked', 'false');
+  });
+  card.classList.add('active');
+  card.setAttribute('aria-checked', 'true');
+  markUnsaved();
+  updatePreview();
+}
+
+// P4: Keyboard handler for tier cards (Enter/Space + Arrow keys)
+function handleTierKey(e, card, tier) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    selectTier(card, tier);
+  }
+  // Arrow key navigation within radiogroup
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const cards = Array.from(card.parentElement.querySelectorAll('.tier-card'));
+    const idx = cards.indexOf(card);
+    let nextIdx;
+    if (e.key === 'ArrowRight') nextIdx = (idx + 1) % cards.length;
+    else nextIdx = (idx - 1 + cards.length) % cards.length;
+    cards[nextIdx].focus();
+    selectTier(cards[nextIdx], tier);
+  }
+}
+
+function onTierChange() {
+  const sel = document.getElementById('tierSelect');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('currDisplay').textContent = opt.dataset.curr + ' (' + opt.dataset.sym + ')';
+  document.getElementById('multDisplay').textContent = opt.dataset.mult + '×';
+  markUnsaved();
+  updatePreview();
+}
+
+function showSoWPreview() {
+  modalTriggerEl = document.activeElement;
+  const modal = document.getElementById('sowModal');
+  modal.classList.remove('hidden');
+  // Focus the close button inside the modal
+  setTimeout(() => {
+    document.getElementById('sowModalClose').focus();
+  }, 50);
+  // Add escape handler
+  document.addEventListener('keydown', modalKeyHandler);
+}
+
+// P6: Close modal, restore focus
+function closeSoWModal() {
+  document.getElementById('sowModal').classList.add('hidden');
+  document.removeEventListener('keydown', modalKeyHandler);
+  if (modalTriggerEl) {
+    modalTriggerEl.focus();
+    modalTriggerEl = null;
+  }
+}
+
+// P6: Modal keyboard handler — Escape to close, Tab trap
+function modalKeyHandler(e) {
+  if (e.key === 'Escape') {
+    closeSoWModal();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const modal = document.getElementById('sowModalContent');
+    const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+}
+
+// P17: Generate SoW with loading state
+function handleGenerateSoW() {
+  const btn = document.getElementById('generateBtn');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="animate-spin inline-block w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Generating…';
+  btn.classList.add('opacity-75', 'cursor-wait');
+  // Simulate generation delay
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    btn.classList.remove('opacity-75', 'cursor-wait');
+    showSoWPreview();
+  }, 1200);
+}
+
+// P12: Client validation
+function validateClient() {
+  const sel = document.getElementById('clientSelect');
+  if (!sel.value) {
+    sel.classList.add('field-error');
+  } else {
+    sel.classList.remove('field-error');
+  }
+}
+
+// P12: Discount validation (warn if > 30)
+function validateDiscount() {
+  const input = document.getElementById('discount');
+  const warning = document.getElementById('discountWarning');
+  const val = parseFloat(input.value);
+  if (val > 30) {
+    warning.classList.add('visible');
+  } else {
+    warning.classList.remove('visible');
+  }
+}
+
+// P15: Mark form as unsaved
+function markUnsaved() {
+  state.unsaved = true;
+  document.getElementById('unsavedDot').classList.add('visible');
+}
+
+function updatePreview() {}
+
+function calcAlacarteTotal() {}
+
+// Init
+switchServiceTab('gm');
+</script>
+</body>
+</html>

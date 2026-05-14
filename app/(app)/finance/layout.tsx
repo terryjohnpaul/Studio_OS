@@ -13,6 +13,8 @@ const tabs = [
   { href: "/finance/expenses", label: "Expenses" },
   { href: "/finance/projects", label: "Project Financials" },
   { href: "/finance/invoices", label: "Invoices" },
+  { href: "/finance/rate-card", label: "Rate Card" },
+  { href: "/finance/sow-builder", label: "SoW Builder" },
 ];
 
 function TabFallback() {
@@ -69,7 +71,7 @@ export default function FinanceLayout({ children }: { children: React.ReactNode 
       </nav>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         <Suspense fallback={<TabFallback />}>
           {children}
         </Suspense>

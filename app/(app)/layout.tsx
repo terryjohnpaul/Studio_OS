@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Suspense fallback={<div className="w-56 border-r bg-sidebar" />}>
+        <Suspense fallback={<div className="w-14 border-r bg-sidebar" />}>
           <SidebarWithRole />
         </Suspense>
         <div className="flex flex-1 flex-col overflow-hidden">
