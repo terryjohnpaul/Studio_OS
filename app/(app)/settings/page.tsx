@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { getCurrentMember } from "@/lib/auth/getCurrentMember";
 import { Settings, User, Palette, Shield, Plug2, Cable } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +13,7 @@ import {
 import Link from "next/link";
 
 async function SettingsContent() {
+  await connection();
   const member = await getCurrentMember();
   const isOwner = member?.role === "owner";
 

@@ -55,6 +55,7 @@ export type RateCardItem = {
   sort_order: number;
   notes: string | null;
   base_inr_max?: number | null;
+  price_overrides?: Record<string, { list?: number; floor?: number }> | null;
 };
 
 export type RateCardDeliverable = {

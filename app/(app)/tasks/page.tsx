@@ -1,8 +1,10 @@
+import { connection } from "next/server";
 import { KanbanShell } from "@/components/modules/tasks/kanban/KanbanShell";
 import { BoardQuote } from "@/components/modules/tasks/kanban/BoardQuote";
 import { getClients, getProjects, getProfiles } from "@/app/(app)/tasks/actions";
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  await connection();
   const [clients, projects, profiles, params] = await Promise.all([
     getClients().catch(() => []),
     getProjects().catch(() => []),

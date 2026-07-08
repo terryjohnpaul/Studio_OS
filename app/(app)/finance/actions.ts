@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireWriteAccess } from "@/lib/auth/getCurrentMember";
 import type {
   Vendor,
   PurchaseOrder,
@@ -36,6 +37,7 @@ export async function createVendor(vendor: {
   phone?: string | null;
   payment_terms?: string;
 }) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vendors")
@@ -47,12 +49,14 @@ export async function createVendor(vendor: {
 }
 
 export async function updateVendor(id: string, updates: Partial<Vendor>) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { error } = await supabase.from("vendors").update(updates).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteVendor(id: string) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { error } = await supabase.from("vendors").delete().eq("id", id);
   if (error) throw error;
@@ -123,6 +127,7 @@ export async function createPurchaseOrder(po: {
   line_items: { description: string; quantity: number; unit_price: number; tax_percent?: number }[];
   status?: POStatus;
 }) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const userId = null; // Clerk IDs are strings, DB expects UUIDs — use null for now
 
@@ -189,6 +194,7 @@ export async function createPurchaseOrder(po: {
 }
 
 export async function updatePOStatus(poId: string, status: POStatus) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const updates: Record<string, unknown> = { status };
   if (status === "approved") updates.approved_at = new Date().toISOString();
@@ -202,6 +208,7 @@ export async function updatePOStatus(poId: string, status: POStatus) {
 }
 
 export async function deletePurchaseOrder(poId: string) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { error } = await supabase.from("purchase_orders").delete().eq("id", poId);
   if (error) throw error;
@@ -245,10 +252,12 @@ export async function createExpense(expense: {
   payment_method?: PaymentMethod;
   project_id?: string | null;
   description?: string | null;
+  receipt_url?: string | null;
   is_recurring?: boolean;
   recurrence_rule?: string | null;
   status?: ExpenseStatus;
 }) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const userId = null; // Clerk IDs are strings, DB expects UUIDs — use null for now
 
@@ -270,15 +279,35 @@ export async function createExpense(expense: {
 }
 
 export async function updateExpense(id: string, updates: Partial<Expense>) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").update(updates).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteExpense(id: string) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function uploadExpenseReceipt(formData: FormData): Promise<string> {
+  await requireWriteAccess();
+  const supabase = await createClient();
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("No file provided");
+
+  const ext = file.name.split(".").pop();
+  const path = `receipts/${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("expense-receipts")
+    .upload(path, file);
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from("expense-receipts").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 // ─── Invoices ───────────────────────────────────────────────────────────────
@@ -311,6 +340,7 @@ export async function createInvoice(invoice: {
   due_date?: string | null;
   notes?: string | null;
 }) {
+  await requireWriteAccess();
   const supabase = await createClient();
 
   const { data: invNum } = await supabase.rpc("generate_invoice_number");
@@ -344,6 +374,7 @@ export async function createInvoice(invoice: {
 }
 
 export async function updateInvoiceStatus(id: string, status: string, paymentRef?: string) {
+  await requireWriteAccess();
   const supabase = await createClient();
   const updates: Record<string, unknown> = { status };
   if (status === "paid") {

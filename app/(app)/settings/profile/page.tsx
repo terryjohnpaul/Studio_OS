@@ -1,10 +1,12 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { getMyProfile } from "./actions";
 import { ProfileForm } from "./profile-form";
 import { User } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 async function ProfileContent() {
+  await connection();
   const profile = await getMyProfile();
 
   return (

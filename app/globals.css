@@ -269,6 +269,48 @@
   --stat-warning: oklch(0.80 0.12 75);
 }
 
+@media print {
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  body > *:not(.print-active) {
+    display: none !important;
+  }
+  .no-print,
+  .sow-modal-header {
+    display: none !important;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+  .print-area * {
+    color: black !important;
+    border-color: #ddd !important;
+  }
+  .print-area .bg-primary\/10 {
+    background: #f0fdf4 !important;
+  }
+  .print-area .text-primary {
+    color: #059669 !important;
+  }
+  .print-area .text-muted-foreground {
+    color: #666 !important;
+  }
+  .print-area .text-red-600 {
+    color: #dc2626 !important;
+  }
+  @page {
+    margin: 15mm;
+    size: A4;
+  }
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -276,6 +318,14 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .rc-selected-cell {
+    box-shadow: inset 0 0 0 3px oklch(0.48 0.13 160.91) !important;
+    background: oklch(0.48 0.13 160.91 / 0.06) !important;
+  }
+  .dark .rc-selected-cell {
+    box-shadow: inset 0 0 0 3px oklch(0.80 0.18 151.71) !important;
+    background: oklch(0.80 0.18 151.71 / 0.08) !important;
   }
 }
 

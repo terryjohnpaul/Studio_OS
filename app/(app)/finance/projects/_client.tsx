@@ -82,7 +82,7 @@ export function ProjectFinancialsClient({ initialData }: { initialData: ProjectF
   const atRiskCount = projects.filter((p) => p.margin_percent < 20 && p.margin_percent >= 0).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-[1200px] mx-auto">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="shadow-sm">

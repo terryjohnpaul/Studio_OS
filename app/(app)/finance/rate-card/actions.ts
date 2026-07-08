@@ -369,3 +369,141 @@ export async function revertChange(changeId: string, reason: string) {
   revalidatePath("/finance/rate-card");
   return { ok: true };
 }
+
+// ─── CRUD: Items ──────────────────────────────────────────────────────────
+
+export async function createItem(
+  versionId: string,
+  section: string,
+  data: { name: string; length?: string; sla?: string; base_inr: number; floor_percent?: number; item_key?: string }
+) {
+  const supabase = await createClient();
+
+  const { data: maxRow } = await supabase
+    .from("rate_card_items")
+    .select("sort_order")
+    .eq("version_id", versionId)
+    .eq("section", section)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .single();
+
+  const sortOrder = (maxRow?.sort_order ?? 0) + 1;
+  const itemKey = data.item_key || data.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+  const { data: created, error } = await supabase
+    .from("rate_card_items")
+    .insert({
+      version_id: versionId,
+      section,
+      item_key: itemKey,
+      name: data.name,
+      length: data.length || null,
+      sla: data.sla || null,
+      base_inr: data.base_inr,
+      floor_percent: data.floor_percent ?? 75,
+      sort_order: sortOrder,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  revalidatePath("/finance/rate-card");
+  return created as RateCardItem;
+}
+
+export async function deleteItem(itemId: string) {
+  const supabase = await createClient();
+  const member = await getCurrentMember();
+
+  const { data: item } = await supabase
+    .from("rate_card_items")
+    .select("id, version_id, name")
+    .eq("id", itemId)
+    .single();
+  if (!item) throw new Error("Item not found");
+
+  await supabase.from("rate_card_changes").insert({
+    version_id: item.version_id,
+    entity_type: "item",
+    entity_id: itemId,
+    field: "deleted",
+    old_value: item.name,
+    new_value: null,
+    reason: "Item deleted",
+    changed_by: member?.id || null,
+  });
+
+  const { error } = await supabase.from("rate_card_items").delete().eq("id", itemId);
+  if (error) throw error;
+
+  revalidatePath("/finance/rate-card");
+  return { ok: true };
+}
+
+export async function reorderItems(updates: { id: string; sort_order: number }[]) {
+  const supabase = await createClient();
+  for (const u of updates) {
+    await supabase.from("rate_card_items").update({ sort_order: u.sort_order }).eq("id", u.id);
+  }
+  revalidatePath("/finance/rate-card");
+  return { ok: true };
+}
+
+// ─── CRUD: Tiers ──────────────────────────────────────────────────────────
+
+export async function createTier(
+  versionId: string,
+  data: { name: string; region: string; tier_level: string; multiplier: number; currency: string; symbol: string; tier_key?: string }
+) {
+  const supabase = await createClient();
+  const tierKey = data.tier_key || data.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+  const { data: created, error } = await supabase
+    .from("rate_card_tiers")
+    .insert({
+      version_id: versionId,
+      tier_key: tierKey,
+      name: data.name,
+      region: data.region,
+      tier_level: data.tier_level,
+      multiplier: data.multiplier,
+      currency: data.currency,
+      symbol: data.symbol,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  revalidatePath("/finance/rate-card");
+  return created as RateCardTier;
+}
+
+export async function deleteTier(tierId: string) {
+  const supabase = await createClient();
+  const member = await getCurrentMember();
+
+  const { data: tier } = await supabase
+    .from("rate_card_tiers")
+    .select("id, version_id, name")
+    .eq("id", tierId)
+    .single();
+  if (!tier) throw new Error("Tier not found");
+
+  await supabase.from("rate_card_changes").insert({
+    version_id: tier.version_id,
+    entity_type: "tier",
+    entity_id: tierId,
+    field: "deleted",
+    old_value: tier.name,
+    new_value: null,
+    reason: "Tier deleted",
+    changed_by: member?.id || null,
+  });
+
+  const { error } = await supabase.from("rate_card_tiers").delete().eq("id", tierId);
+  if (error) throw error;
+
+  revalidatePath("/finance/rate-card");
+  return { ok: true };
+}

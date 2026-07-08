@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from "react";
-import { Check, X, Printer, FileDown } from "lucide-react";
+import { Check, X, Printer, FileDown, RotateCcw, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import type {
@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createSow, updateSow, getNextSowRef, type SowRow } from "./actions";
+import { generateSowPdfHtml } from "@/lib/sow/generate-pdf-html";
+import { FYND_STUDIOS_LOGO } from "@/lib/sow/logo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +26,8 @@ type Props = {
   version: RateCardVersion;
   tiers: RateCardTier[];
   items: RateCardItem[];
+  editingSow?: SowRow | null;
+  onSaved?: () => void;
 };
 
 type GmPlanType = "volume" | "alacarte" | "pilot";
@@ -46,12 +51,139 @@ const UPFRONT_OPTIONS = [
 ] as const;
 
 const SURCHARGES = [
-  { label: "Same-day rush (<12 hr)", value: "+30%" },
-  { label: "Scope change after storyboard", value: "+50%" },
-  { label: "Brief change after delivery", value: "+100%" },
-  { label: "Talent / music licensing", value: "cost +15%" },
-  { label: "Language pack (per lang beyond included)", value: "+25%" },
+  { label: "Same-day rush", desc: "Delivery in under 12 hours", value: "+30%" },
+  { label: "Scope change", desc: "After storyboard approval", value: "+50%" },
+  { label: "Brief change", desc: "After final delivery", value: "+100%" },
+  { label: "Talent / music", desc: "Licensed assets, pass-through", value: "cost +15%" },
+  { label: "Language pack", desc: "Per language beyond included", value: "+25%" },
 ];
+
+const COUNTRIES: Record<string, { name: string; local: string; perUSD: number; symbol: string }> = {
+  IN: { name: "India", local: "INR", perUSD: 83.0, symbol: "₹" },
+  AE: { name: "UAE", local: "AED", perUSD: 3.67, symbol: "AED" },
+  QA: { name: "Qatar", local: "QAR", perUSD: 3.64, symbol: "QAR" },
+  KW: { name: "Kuwait", local: "KWD", perUSD: 0.31, symbol: "KWD" },
+  BH: { name: "Bahrain", local: "BHD", perUSD: 0.38, symbol: "BHD" },
+  OM: { name: "Oman", local: "OMR", perUSD: 0.38, symbol: "OMR" },
+  IL: { name: "Israel", local: "ILS", perUSD: 3.72, symbol: "₪" },
+  SA: { name: "Saudi Arabia", local: "SAR", perUSD: 3.75, symbol: "SAR" },
+  EG: { name: "Egypt", local: "EGP", perUSD: 48.5, symbol: "EGP" },
+  MA: { name: "Morocco", local: "MAD", perUSD: 10.0, symbol: "MAD" },
+  JO: { name: "Jordan", local: "JOD", perUSD: 0.71, symbol: "JOD" },
+  ZA: { name: "South Africa", local: "ZAR", perUSD: 18.3, symbol: "ZAR" },
+  NG: { name: "Nigeria", local: "NGN", perUSD: 1600, symbol: "NGN" },
+  KE: { name: "Kenya", local: "KES", perUSD: 129, symbol: "KES" },
+  TN: { name: "Tunisia", local: "TND", perUSD: 3.1, symbol: "TND" },
+  LB: { name: "Lebanon", local: "LBP", perUSD: 89500, symbol: "LBP" },
+  SG: { name: "Singapore", local: "SGD", perUSD: 1.35, symbol: "S$" },
+  MY: { name: "Malaysia", local: "MYR", perUSD: 4.72, symbol: "MYR" },
+  TH: { name: "Thailand", local: "THB", perUSD: 36.5, symbol: "฿" },
+  BN: { name: "Brunei", local: "BND", perUSD: 1.35, symbol: "B$" },
+  ID: { name: "Indonesia", local: "IDR", perUSD: 16000, symbol: "Rp" },
+  PH: { name: "Philippines", local: "PHP", perUSD: 58, symbol: "₱" },
+  VN: { name: "Vietnam", local: "VND", perUSD: 25000, symbol: "₫" },
+  KH: { name: "Cambodia", local: "KHR", perUSD: 4100, symbol: "KHR" },
+  MM: { name: "Myanmar", local: "MMK", perUSD: 2100, symbol: "MMK" },
+  LA: { name: "Laos", local: "LAK", perUSD: 21500, symbol: "LAK" },
+  GB: { name: "United Kingdom", local: "GBP", perUSD: 0.79, symbol: "£" },
+  IE: { name: "Ireland", local: "EUR", perUSD: 0.92, symbol: "€" },
+  DE: { name: "Germany", local: "EUR", perUSD: 0.92, symbol: "€" },
+  FR: { name: "France", local: "EUR", perUSD: 0.92, symbol: "€" },
+  NL: { name: "Netherlands", local: "EUR", perUSD: 0.92, symbol: "€" },
+  CH: { name: "Switzerland", local: "CHF", perUSD: 0.88, symbol: "CHF" },
+  SE: { name: "Sweden", local: "SEK", perUSD: 10.7, symbol: "SEK" },
+  DK: { name: "Denmark", local: "DKK", perUSD: 6.9, symbol: "DKK" },
+  NO: { name: "Norway", local: "NOK", perUSD: 10.8, symbol: "NOK" },
+  FI: { name: "Finland", local: "EUR", perUSD: 0.92, symbol: "€" },
+  BE: { name: "Belgium", local: "EUR", perUSD: 0.92, symbol: "€" },
+  AT: { name: "Austria", local: "EUR", perUSD: 0.92, symbol: "€" },
+  ES: { name: "Spain", local: "EUR", perUSD: 0.92, symbol: "€" },
+  IT: { name: "Italy", local: "EUR", perUSD: 0.92, symbol: "€" },
+  PT: { name: "Portugal", local: "EUR", perUSD: 0.92, symbol: "€" },
+  US: { name: "United States", local: "USD", perUSD: 1.0, symbol: "$" },
+  CA: { name: "Canada", local: "CAD", perUSD: 1.37, symbol: "C$" },
+  AU: { name: "Australia", local: "AUD", perUSD: 1.51, symbol: "A$" },
+  NZ: { name: "New Zealand", local: "NZD", perUSD: 1.65, symbol: "NZ$" },
+};
+
+const DEFAULT_CUSTOMER_REQUIREMENTS = [
+  "Brand brief · positioning · tonality references",
+  "Brand assets (logo files, product imagery, colour palette, fonts)",
+  "Target audience definition · market(s) · language(s) required",
+  "Reference creatives (3–5 examples preferred)",
+  "Performance benchmarks (current ROAS / CTR / engagement metrics)",
+  "Approver and feedback turnaround SLA (24–48 hrs ideal)",
+  "Access to brand's social handles / ad accounts (for posting)",
+];
+
+type Deliverable = { id: string; label: string; defaultQty: string | number; unit: string; editable: boolean };
+
+const TIER_DELIVERABLES: Record<string, Deliverable[]> = {
+  vol_starter: [
+    { id: "sf", label: "Short-form videos (≤15s)", defaultQty: 10, unit: "/ mo", editable: true },
+    { id: "bf", label: "Brand film (30s)", defaultQty: 1, unit: "/ mo", editable: true },
+    { id: "cp", label: "Carousel pack", defaultQty: 1, unit: "/ mo", editable: true },
+    { id: "lang", label: "Localisation languages", defaultQty: 2, unit: "lang", editable: true },
+    { id: "dri", label: "Pod DRI", defaultQty: "Shared", unit: "", editable: false },
+  ],
+  vol_pro: [
+    { id: "sf", label: "Short-form videos (≤15s)", defaultQty: 40, unit: "/ mo", editable: true },
+    { id: "bf", label: "Brand films (30s)", defaultQty: 3, unit: "/ mo", editable: true },
+    { id: "cin", label: "Cinematic hero", defaultQty: 1, unit: "/ mo", editable: true },
+    { id: "cb", label: "Carousel / banner packs", defaultQty: "Unlimited", unit: "", editable: false },
+    { id: "lang", label: "Localisation languages", defaultQty: 6, unit: "lang", editable: true },
+    { id: "dri", label: "Pod DRI", defaultQty: "Dedicated", unit: "", editable: false },
+  ],
+  vol_enterprise: [
+    { id: "sf", label: "Short-form (FUP)", defaultQty: "Unlimited", unit: "", editable: false },
+    { id: "bf", label: "Brand films", defaultQty: 8, unit: "/ mo", editable: true },
+    { id: "cin", label: "Cinematic films", defaultQty: 2, unit: "/ mo", editable: true },
+    { id: "lang", label: "Localisation languages", defaultQty: 12, unit: "lang", editable: true },
+    { id: "pod", label: "Motion designer pod", defaultQty: "Dedicated", unit: "", editable: false },
+    { id: "rev", label: "Weekly portfolio review", defaultQty: "Yes", unit: "", editable: false },
+  ],
+  vol_master: [
+    { id: "catalog", label: "Catalog negotiated", defaultQty: "End-to-end", unit: "", editable: false },
+    { id: "creative", label: "Creative + post + localisation", defaultQty: "Full", unit: "", editable: false },
+    { id: "cd", label: "Creative Director", defaultQty: "Dedicated", unit: "", editable: false },
+    { id: "concierge", label: "Concierge desk", defaultQty: "Yes", unit: "", editable: false },
+    { id: "gov", label: "Founder governance", defaultQty: "Yes", unit: "", editable: false },
+    { id: "sla_rg", label: "Reliance-grade SLAs", defaultQty: "Yes", unit: "", editable: false },
+  ],
+  br_starter: [
+    { id: "bwt", label: "Brand-world training", defaultQty: "One-time", unit: "", editable: false },
+    { id: "cd", label: "Creative Director", defaultQty: "Named", unit: "", editable: false },
+    { id: "hero", label: "Hero film", defaultQty: 1, unit: "/ qtr", editable: true },
+    { id: "camp", label: "Campaigns", defaultQty: 2, unit: "/ qtr", editable: true },
+    { id: "panel", label: "StudioOS customer panel", defaultQty: "Included", unit: "", editable: false },
+    { id: "rev", label: "Monthly review", defaultQty: "Yes", unit: "", editable: false },
+  ],
+  br_pro: [
+    { id: "starter", label: "All Starter benefits", defaultQty: "Included", unit: "", editable: false },
+    { id: "hero", label: "Hero films", defaultQty: 2, unit: "/ qtr", editable: true },
+    { id: "camp", label: "Campaigns", defaultQty: 6, unit: "/ qtr", editable: true },
+    { id: "strat", label: "Brand strategist embed", defaultQty: "Yes", unit: "", editable: false },
+    { id: "ab", label: "Cohort A/B testing", defaultQty: "Yes", unit: "", editable: false },
+    { id: "rev", label: "Quarterly creative review", defaultQty: "Yes", unit: "", editable: false },
+    { id: "lang", label: "Localisation languages", defaultQty: 6, unit: "lang", editable: true },
+  ],
+  br_enterprise: [
+    { id: "pro", label: "All Professional benefits", defaultQty: "Included", unit: "", editable: false },
+    { id: "hero", label: "Hero films", defaultQty: "Unlimited (FUP)", unit: "", editable: false },
+    { id: "lang", label: "Localisation languages", defaultQty: 12, unit: "lang", editable: true },
+    { id: "pod", label: "Dedicated pod (CD + strategist + AE + 2 designers)", defaultQty: "Yes", unit: "", editable: false },
+    { id: "planner", label: "Embedded media planner", defaultQty: "Yes", unit: "", editable: false },
+    { id: "audit", label: "Quarterly brand audit", defaultQty: "Yes", unit: "", editable: false },
+  ],
+  br_master: [
+    { id: "creative_own", label: "Creative ownership across BUs", defaultQty: "Full", unit: "", editable: false },
+    { id: "mv", label: "Multi-vertical coverage", defaultQty: "Yes", unit: "", editable: false },
+    { id: "kill", label: "On-brand kill-switch", defaultQty: "Yes", unit: "", editable: false },
+    { id: "gov", label: "Founder governance", defaultQty: "Yes", unit: "", editable: false },
+    { id: "review", label: "Quarterly leadership review with Fynd C-suite", defaultQty: "Yes", unit: "", editable: false },
+    { id: "partner", label: "Strategic partner-of-record", defaultQty: "Yes", unit: "", editable: false },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -59,6 +191,17 @@ const SURCHARGES = [
 function fmtPrice(amount: number, symbol: string): string {
   if (symbol === "$") return `$${amount.toLocaleString("en-US")}`;
   return `${symbol}${amount.toLocaleString("en-IN")}`;
+}
+
+function formatLocal(amount: number, currency: string, countryCode: string): string | null {
+  if (currency === "INR") return null;
+  const c = COUNTRIES[countryCode];
+  if (!c || c.local === "USD") return null;
+  const local = amount * c.perUSD;
+  const rounded = local > 10000 ? Math.round(local / 100) * 100
+    : local > 100 ? Math.round(local)
+    : Math.round(local * 100) / 100;
+  return `≈ ${c.symbol} ${rounded.toLocaleString("en-US")}`;
 }
 
 function StepHeader({
@@ -101,9 +244,12 @@ function FieldLabel({
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function SoWBuilderClient({ version, tiers, items }: Props) {
-  // Live FX rate
+export function SoWBuilderClient({ version, tiers, items, editingSow, onSaved }: Props) {
+  const [sowId, setSowId] = useState<string | null>(editingSow?.id ?? null);
+  const [saving, setSaving] = useState(false);
+  // Live FX rates
   const [liveFxRate, setLiveFxRate] = useState<number | null>(null);
+  const [liveRates, setLiveRates] = useState<Record<string, number>>({});
   const fxRate = liveFxRate ?? version.fx_rate;
 
   useEffect(() => {
@@ -111,34 +257,46 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
       .then((res) => res.json())
       .then((data) => {
         if (data?.rates?.INR) setLiveFxRate(data.rates.INR);
+        if (data?.rates) setLiveRates(data.rates);
       })
       .catch(() => {});
   }, []);
 
   // Step 1: Customer
-  const [clientName, setClientName] = useState("");
-  const [brandName, setBrandName] = useState("");
-  const [buyerName, setBuyerName] = useState("");
-  const [salesDri, setSalesDri] = useState("");
+  const [clientName, setClientName] = useState(editingSow?.client_name ?? "");
+  const [brandName, setBrandName] = useState(editingSow?.brand_name ?? "");
+  const [buyerName, setBuyerName] = useState(editingSow?.buyer_name ?? "");
+  const [salesDri, setSalesDri] = useState(editingSow?.sales_dri ?? "");
 
   // Step 2: Market
-  const [selectedTierKey, setSelectedTierKey] = useState("india");
+  const [selectedTierKey, setSelectedTierKey] = useState(editingSow?.selected_tier_key ?? "india");
+  const [selectedCountry, setSelectedCountry] = useState(() => {
+    if (editingSow) {
+      const tier = tiers.find(t => t.tier_key === editingSow.selected_tier_key);
+      return tier?.countries?.[0] ?? "IN";
+    }
+    return "IN";
+  });
 
   // Step 3: Services
-  const [gmEnabled, setGmEnabled] = useState(true);
-  const [mkEnabled, setMkEnabled] = useState(false);
+  const [gmEnabled, setGmEnabled] = useState(editingSow?.gm_enabled ?? true);
+  const [mkEnabled, setMkEnabled] = useState(editingSow?.mk_enabled ?? false);
 
   // Step 4: Configure
-  const [activeService, setActiveService] = useState<"gm" | "mk">("gm");
-  const [gmPlanType, setGmPlanType] = useState<GmPlanType>("volume");
-  const [mkPlanType, setMkPlanType] = useState<MkPlanType>("brand");
-  const [selectedGmTier, setSelectedGmTier] = useState("vol_pro");
-  const [selectedMkTier, setSelectedMkTier] = useState("br_starter");
+  const [activeService, setActiveService] = useState<"gm" | "mk">(editingSow?.gm_enabled ? "gm" : "mk");
+  const [gmPlanType, setGmPlanType] = useState<GmPlanType>((editingSow?.gm_plan_type as GmPlanType) ?? "volume");
+  const [mkPlanType, setMkPlanType] = useState<MkPlanType>((editingSow?.mk_plan_type as MkPlanType) ?? "brand");
+  const [selectedGmTier, setSelectedGmTier] = useState(editingSow?.selected_gm_tier ?? "vol_pro");
+  const [selectedMkTier, setSelectedMkTier] = useState(editingSow?.selected_mk_tier ?? "br_starter");
   const [alacarteQtys, setAlacarteQtys] = useState<Record<string, number>>({});
   const [campaignQtys, setCampaignQtys] = useState<Record<string, number>>({});
   const [strategicQtys, setStrategicQtys] = useState<Record<string, number>>(
     {},
   );
+  const [showGmAddons, setShowGmAddons] = useState(false);
+
+  // Editable deliverables per tier
+  const [customDeliverables, setCustomDeliverables] = useState<Record<string, { id: string; label: string; qty: string | number; unit: string; editable: boolean }[]>>({});
 
   // SoW modal
   const [sowModalOpen, setSowModalOpen] = useState(false);
@@ -146,15 +304,125 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
   const [sowDate, setSowDate] = useState("");
   const [sowTerm, setSowTerm] = useState("12 months from effective date");
   const [sowNotes, setSowNotes] = useState("");
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+
+  // Customer requirements
+  const [customerRequirements, setCustomerRequirements] = useState<string[]>(
+    editingSow?.customer_requirements ?? [...DEFAULT_CUSTOMER_REQUIREMENTS]
+  );
+  const [newRequirement, setNewRequirement] = useState("");
 
   // Step 5: Commercials
-  const [discount, setDiscount] = useState(10);
-  const [upfront, setUpfront] = useState(5);
-  const [months, setMonths] = useState(12);
+  const [discount, setDiscount] = useState(editingSow?.discount ?? 10);
+  const [upfront, setUpfront] = useState(editingSow?.upfront ?? 5);
+  const [months, setMonths] = useState(editingSow?.months ?? 12);
+  const [targetPrice, setTargetPrice] = useState(0);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  // Autosave every 30s
+  function getDeliverables(tierKey: string) {
+    if (customDeliverables[tierKey]) return customDeliverables[tierKey];
+    const defs = TIER_DELIVERABLES[tierKey];
+    if (!defs) return [];
+    return defs.map(d => ({ id: d.id, label: d.label, qty: d.defaultQty, unit: d.unit, editable: d.editable }));
+  }
+
+  function updateDeliverableQty(tierKey: string, delivId: string, qty: number) {
+    const list = getDeliverables(tierKey);
+    setCustomDeliverables(prev => ({
+      ...prev,
+      [tierKey]: list.map(d => d.id === delivId ? { ...d, qty } : d),
+    }));
+  }
+
+  function removeDeliverable(tierKey: string, delivId: string) {
+    const list = getDeliverables(tierKey);
+    setCustomDeliverables(prev => ({
+      ...prev,
+      [tierKey]: list.filter(d => d.id !== delivId),
+    }));
+  }
+
+  function buildSaveData(sowRefValue: string) {
+    const alacarteAddonsData = alacarteItems
+      .filter(i => (alacarteQtys[i.item_key] ?? 0) > 0)
+      .map(i => ({ item_key: i.item_key, name: i.name, qty: alacarteQtys[i.item_key], unit_price: price(i.base_inr), length: i.length ?? undefined }));
+    const gmDelivs = gmEnabled && gmPlanType === "volume" && selectedGmTier ? getDeliverables(selectedGmTier) : [];
+    const mkDelivs = mkEnabled && mkPlanType === "brand" && selectedMkTier ? getDeliverables(selectedMkTier) : [];
+    const gmTierItem = gmEnabled && gmPlanType === "volume" ? items.find(i => i.item_key === selectedGmTier) : null;
+    const mkTierItem = mkEnabled && mkPlanType === "brand" ? items.find(i => i.item_key === selectedMkTier) : null;
+    const tierNotes = [gmTierItem?.notes, mkTierItem?.notes].filter(Boolean).join(" | ") || undefined;
+    return {
+      sow_ref: sowRefValue,
+      client_name: clientName,
+      brand_name: brandName || null,
+      buyer_name: buyerName || null,
+      sales_dri: salesDri || null,
+      selected_tier_key: selectedTierKey,
+      tier_name: selectedTier?.name ?? "",
+      gm_enabled: gmEnabled,
+      mk_enabled: mkEnabled,
+      gm_plan_type: gmPlanType,
+      mk_plan_type: mkPlanType,
+      selected_gm_tier: selectedGmTier || null,
+      selected_mk_tier: selectedMkTier || null,
+      discount,
+      upfront,
+      months,
+      net_monthly: Math.round(netMonthly),
+      annual_value: Math.round(annualValue),
+      currency,
+      symbol,
+      customer_requirements: customerRequirements,
+      list_monthly: Math.round(listMonthly),
+      bundle_discount: Math.round(bundleDiscount),
+      alacarte_addons: alacarteAddonsData,
+      scope_snapshot: {
+        gmDeliverables: gmDelivs.length > 0 ? gmDelivs : undefined,
+        mkDeliverables: mkDelivs.length > 0 ? mkDelivs : undefined,
+        gmTierName: gmTierItem?.name,
+        mkTierName: mkTierItem?.name,
+        tierNotes,
+      },
+      status: "draft" as const,
+    };
+  }
+
+  function resetDeliverables(tierKey: string) {
+    setCustomDeliverables(prev => {
+      const next = { ...prev };
+      delete next[tierKey];
+      return next;
+    });
+  }
+
+  function handleResetAll() {
+    setClientName(""); setBrandName(""); setBuyerName(""); setSalesDri("");
+    setSelectedTierKey("india"); setSelectedCountry("IN");
+    setGmEnabled(true); setMkEnabled(false);
+    setGmPlanType("volume"); setMkPlanType("brand");
+    setSelectedGmTier(""); setSelectedMkTier("");
+    setAlacarteQtys({}); setCampaignQtys({}); setStrategicQtys({});
+    setDiscount(10); setUpfront(5); setMonths(12); setTargetPrice(0);
+    setCustomDeliverables({});
+    setShowGmAddons(false);
+    setCustomerRequirements([...DEFAULT_CUSTOMER_REQUIREMENTS]); setNewRequirement("");
+    setSowId(null); setLastSaved(null);
+    setLogoDataUrl(null);
+    localStorage.removeItem("sow_autosave");
+    toast.success("Form reset");
+  }
+
+  // Auto-select country when tier changes
   useEffect(() => {
+    const tier = tiers.find(t => t.tier_key === selectedTierKey);
+    if (tier && tier.countries.length > 0 && !tier.countries.includes(selectedCountry)) {
+      setSelectedCountry(tier.countries[0]);
+    }
+  }, [selectedTierKey, tiers, selectedCountry]);
+
+  // Autosave every 30s — only for new SOWs, not when editing existing ones
+  useEffect(() => {
+    if (editingSow) return;
     const timer = setInterval(() => {
       if (clientName.trim()) {
         const draft = { clientName, brandName, buyerName, salesDri, selectedTierKey, gmEnabled, mkEnabled, discount, upfront, months };
@@ -163,7 +431,7 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
       }
     }, 30000);
     return () => clearInterval(timer);
-  }, [clientName, brandName, buyerName, salesDri, selectedTierKey, gmEnabled, mkEnabled, discount, upfront, months]);
+  }, [clientName, brandName, buyerName, salesDri, selectedTierKey, gmEnabled, mkEnabled, discount, upfront, months, editingSow]);
 
   // Warn on page close with unsaved changes
   useEffect(() => {
@@ -174,8 +442,9 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [clientName]);
 
-  // Restore autosave on mount
+  // Restore autosave on mount — skip when editing an existing SOW
   useEffect(() => {
+    if (editingSow) return;
     try {
       const saved = localStorage.getItem("sow_autosave");
       if (saved) {
@@ -246,17 +515,22 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
   );
 
   // ---- Price computation ----
+  const alacarteAddonTotal = useMemo(() => {
+    return alacarteItems.reduce((sum, item) => {
+      const qty = alacarteQtys[item.item_key] ?? 0;
+      return sum + qty * price(item.base_inr);
+    }, 0);
+  }, [alacarteQtys, alacarteItems, multiplier]);
+
   const gmMonthly = useMemo(() => {
     if (!gmEnabled) return 0;
     if (gmPlanType === "volume") {
       const item = items.find((i) => i.item_key === selectedGmTier);
-      return item ? price(item.base_inr) : 0;
+      const tierBase = item ? price(item.base_inr) : 0;
+      return tierBase + alacarteAddonTotal;
     }
     if (gmPlanType === "alacarte") {
-      return alacarteItems.reduce((sum, item) => {
-        const qty = alacarteQtys[item.item_key] ?? 0;
-        return sum + qty * price(item.base_inr);
-      }, 0);
+      return alacarteAddonTotal;
     }
     if (gmPlanType === "pilot") {
       return pilotItem ? price(pilotItem.base_inr) : 0;
@@ -266,9 +540,8 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
     gmEnabled,
     gmPlanType,
     selectedGmTier,
-    alacarteQtys,
+    alacarteAddonTotal,
     items,
-    alacarteItems,
     pilotItem,
     multiplier,
   ]);
@@ -360,18 +633,18 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
 
   // ---- Scope label ----
   const gmScopeLabel = gmEnabled
-    ? `Gen Media · ${GM_PLAN_LABELS[gmPlanType]}${gmPlanType === "volume" ? ` · ${items.find((i) => i.item_key === selectedGmTier)?.name ?? ""}` : ""}`
+    ? `Gen Media · ${GM_PLAN_LABELS[gmPlanType]}${gmPlanType === "volume" && selectedGmTier ? ` · ${items.find((i) => i.item_key === selectedGmTier)?.name ?? ""}` : ""}`
     : "";
   const mkScopeLabel = mkEnabled
-    ? `Marketing · ${MK_PLAN_LABELS[mkPlanType]}${mkPlanType === "brand" ? ` · ${items.find((i) => i.item_key === selectedMkTier)?.name ?? ""}` : ""}`
+    ? `Marketing · ${MK_PLAN_LABELS[mkPlanType]}${mkPlanType === "brand" && selectedMkTier ? ` · ${items.find((i) => i.item_key === selectedMkTier)?.name ?? ""}` : ""}`
     : "";
 
   // ---- Render ----
   return (
-    <div className="flex-1 flex overflow-hidden relative max-w-[1400px] mx-auto w-full">
+    <div className="flex-1 flex overflow-hidden relative max-w-[1400px] mx-auto w-full gap-5 h-full min-h-0">
       {/* ========== LEFT: CONFIG ========== */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide border-r">
-        <div className="p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="p-5 pl-0 space-y-4">
         {/* Step 1: Customer */}
         <section className="bg-card rounded-lg border overflow-hidden">
           <StepHeader label="1 · Customer" meta="Linked to Clients module" />
@@ -429,28 +702,68 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
         <section className="bg-card rounded-lg border overflow-hidden">
           <StepHeader label="2 · Market" />
           <div className="p-4 space-y-3">
-            <div>
-              <FieldLabel htmlFor="sow-tier" required>
-                Region / Tier
-              </FieldLabel>
-              <Select value={selectedTierKey} onValueChange={setSelectedTierKey}>
-                <SelectTrigger className="mt-1 h-9 w-full text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {tiers.map((t) => (
-                    <SelectItem key={t.tier_key} value={t.tier_key}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel htmlFor="sow-tier" required>
+                  Region / Tier
+                </FieldLabel>
+                <Select value={selectedTierKey} onValueChange={setSelectedTierKey}>
+                  <SelectTrigger className="mt-1 h-9 w-full text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiers.map((t) => (
+                      <SelectItem key={t.tier_key} value={t.tier_key}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel htmlFor="sow-country">
+                  Country (local currency)
+                </FieldLabel>
+                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                  <SelectTrigger className="mt-1 h-9 w-full text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedTier?.countries.map((code) => {
+                      const c = COUNTRIES[code];
+                      return c ? (
+                        <SelectItem key={code} value={code}>
+                          {c.name} ({c.local})
+                        </SelectItem>
+                      ) : null;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="bg-primary/10 border border-primary/30 px-3 py-2 rounded-md flex items-center gap-4 text-sm">
+            <div className="bg-primary/10 border border-primary/30 px-3 py-2 rounded-md flex items-center gap-4 text-sm flex-wrap">
               <span className="text-muted-foreground font-semibold">Currency:</span>
               <span className="font-bold text-primary">
                 {currency} ({symbol})
               </span>
+              <span className="text-muted-foreground/50">&middot;</span>
+              <span className="text-muted-foreground">Local:</span>
+              <span className="font-bold text-primary">
+                {(() => {
+                  if (currency === "INR") return "INR (₹)";
+                  const c = COUNTRIES[selectedCountry];
+                  if (!c || c.local === "USD") return "USD ($)";
+                  const liveLocal = liveRates[c.local];
+                  if (liveLocal) return `1 USD ≈ ${liveLocal.toFixed(2)} ${c.local}`;
+                  return `1 USD ≈ ${c.perUSD} ${c.local}`;
+                })()}
+              </span>
+              {(() => {
+                const c = COUNTRIES[selectedCountry];
+                return c && c.local !== "USD" && currency !== "INR" && liveRates[c.local] ? (
+                  <span className="text-[9px] text-primary font-medium">LIVE</span>
+                ) : null;
+              })()}
               <span className="text-muted-foreground/50">&middot;</span>
               <span className="text-muted-foreground">Multiplier:</span>
               <span className="font-bold text-primary">
@@ -552,19 +865,73 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                 onSelect={(k) => setGmPlanType(k as GmPlanType)}
               />
               {gmPlanType === "volume" && (
-                <div className="p-4">
+                <div className="p-4 space-y-4">
+                  <p className="text-[11px] text-muted-foreground">Pick a monthly tier. Quantities are editable for micro-adjustment within the tier scope — price stays at tier rate.</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {volumeItems.slice(0, 3).map((item) => (
+                    {volumeItems.filter(i => i.item_key !== "vol_master").map((item) => (
                       <TierCard
                         key={item.item_key}
                         name={item.name}
                         price={fmtPrice(price(item.base_inr), symbol)}
+                        localPrice={formatLocal(price(item.base_inr), currency, selectedCountry)}
                         unit={item.unit ?? "/mo"}
                         sla={item.sla ?? ""}
                         active={selectedGmTier === item.item_key}
-                        onClick={() => setSelectedGmTier(item.item_key)}
+                        onClick={() => setSelectedGmTier(selectedGmTier === item.item_key ? "" : item.item_key)}
+                        deliverables={getDeliverables(item.item_key)}
+                        onDelivQtyChange={(id, qty) => updateDeliverableQty(item.item_key, id, qty)}
+                        onDelivRemove={(id) => removeDeliverable(item.item_key, id)}
+                        onReset={() => resetDeliverables(item.item_key)}
+                        hasCustom={!!customDeliverables[item.item_key]}
                       />
                     ))}
+                  </div>
+                  {(() => {
+                    const master = volumeItems.find(i => i.item_key === "vol_master");
+                    if (!master) return null;
+                    return (
+                      <>
+                        <p className="text-[11px] text-muted-foreground mt-2">Annual Master · Reliance-grade · founder-governed</p>
+                        <AnnualMasterCard
+                          item={master}
+                          price={fmtPrice(price(master.base_inr), symbol)}
+                          localPrice={formatLocal(price(master.base_inr), currency, selectedCountry)}
+                          active={selectedGmTier === master.item_key}
+                          onClick={() => setSelectedGmTier(selectedGmTier === master.item_key ? "" : master.item_key)}
+                          deliverables={getDeliverables(master.item_key)}
+                        />
+                      </>
+                    );
+                  })()}
+                  {/* À la carte add-ons within volume plan */}
+                  <div className="border rounded-lg overflow-hidden mt-1">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold text-muted-foreground hover:bg-muted/50 transition-colors"
+                      onClick={() => setShowGmAddons(!showGmAddons)}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="size-3" />
+                        Add-ons from À La Carte
+                        {Object.values(alacarteQtys).filter(q => q > 0).length > 0 && (
+                          <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                            {Object.values(alacarteQtys).filter(q => q > 0).length}
+                          </Badge>
+                        )}
+                      </span>
+                      <ChevronDown className={cn("size-3.5 transition-transform", showGmAddons && "rotate-180")} />
+                    </button>
+                    {showGmAddons && (
+                      <div className="border-t px-3 py-3">
+                        <AlacarteTable
+                          items={alacarteItems}
+                          qtys={alacarteQtys}
+                          setQtys={setAlacarteQtys}
+                          symbol={symbol}
+                          priceFn={price}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -636,21 +1003,45 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                 onSelect={(k) => setMkPlanType(k as MkPlanType)}
               />
               {mkPlanType === "brand" && (
-                <div className="p-4">
+                <div className="p-4 space-y-4">
+                  <p className="text-[11px] text-muted-foreground">Pick a monthly tier. Quantities are editable for micro-adjustment within the tier scope — price stays at tier rate.</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {brandRetainerItems.slice(0, 3).map((item) => (
+                    {brandRetainerItems.filter(i => i.item_key !== "br_master").map((item) => (
                       <TierCard
                         key={item.item_key}
                         name={item.name}
                         price={fmtPrice(price(item.base_inr), symbol)}
+                        localPrice={formatLocal(price(item.base_inr), currency, selectedCountry)}
                         unit={item.unit ?? "/mo"}
                         sla={item.sla ?? ""}
                         notes={item.notes ?? undefined}
                         active={selectedMkTier === item.item_key}
-                        onClick={() => setSelectedMkTier(item.item_key)}
+                        onClick={() => setSelectedMkTier(selectedMkTier === item.item_key ? "" : item.item_key)}
+                        deliverables={getDeliverables(item.item_key)}
+                        onDelivQtyChange={(id, qty) => updateDeliverableQty(item.item_key, id, qty)}
+                        onDelivRemove={(id) => removeDeliverable(item.item_key, id)}
+                        onReset={() => resetDeliverables(item.item_key)}
+                        hasCustom={!!customDeliverables[item.item_key]}
                       />
                     ))}
                   </div>
+                  {(() => {
+                    const master = brandRetainerItems.find(i => i.item_key === "br_master");
+                    if (!master) return null;
+                    return (
+                      <>
+                        <p className="text-[11px] text-muted-foreground mt-2">Annual Master · Reliance-grade · founder-governed</p>
+                        <AnnualMasterCard
+                          item={master}
+                          price={fmtPrice(price(master.base_inr), symbol)}
+                          localPrice={formatLocal(price(master.base_inr), currency, selectedCountry)}
+                          active={selectedMkTier === master.item_key}
+                          onClick={() => setSelectedMkTier(selectedMkTier === master.item_key ? "" : master.item_key)}
+                          deliverables={getDeliverables(master.item_key)}
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               {mkPlanType === "campaign" && (
@@ -708,12 +1099,14 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                   max={50}
                   step={0.5}
                   className="mt-1"
-                  value={discount}
-                  onChange={(e) =>
-                    setDiscount(
-                      Math.min(50, Math.max(0, Number(e.target.value))),
-                    )
-                  }
+                  value={discount || ""}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") { setDiscount(0); return; }
+                    setDiscount(Math.min(50, Math.max(0, Number(v))));
+                  }}
                 />
                 {discount > 30 && (
                   <p className="text-[10px] text-amber-600 mt-1">
@@ -748,13 +1141,41 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                   min={1}
                   max={36}
                   className="mt-1"
-                  value={months}
-                  onChange={(e) =>
-                    setMonths(
-                      Math.min(36, Math.max(1, Number(e.target.value))),
-                    )
-                  }
+                  value={months || ""}
+                  placeholder="12"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") { setMonths(0); return; }
+                    setMonths(Math.min(36, Math.max(1, Number(v))));
+                  }}
+                  onBlur={() => { if (!months) setMonths(12); }}
                 />
+              </div>
+            </div>
+
+            {/* Reverse lookup */}
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+              <div>
+                <FieldLabel htmlFor="sow-target">Customer&apos;s target price (optional)</FieldLabel>
+                <Input
+                  id="sow-target"
+                  type="number"
+                  min={0}
+                  step={100}
+                  placeholder="enter what customer wants to pay"
+                  className="mt-1"
+                  value={targetPrice || ""}
+                  onChange={(e) => setTargetPrice(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+              <div>
+                <FieldLabel>Implied discount</FieldLabel>
+                <div className="mt-1 h-9 flex items-center px-3 bg-muted/50 border rounded-md text-sm font-bold text-primary">
+                  {targetPrice > 0 && listMonthly > 0
+                    ? `${(((listMonthly - targetPrice) / listMonthly) * 100).toFixed(1)}%`
+                    : "—"}
+                </div>
               </div>
             </div>
 
@@ -836,16 +1257,19 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
             {/* Surcharges */}
             <div className="border-t pt-3">
               <div className="text-[11px] font-bold text-muted-foreground uppercase mb-2">
-                Surcharges (not discountable)
+                Surcharges · applied on list price · not discountable
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+              <div className="space-y-1.5">
                 {SURCHARGES.map((s) => (
                   <div
                     key={s.label}
-                    className="flex justify-between bg-muted/50 rounded px-2 py-1.5"
+                    className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2"
                   >
-                    <span>{s.label}</span>
-                    <span className="font-semibold text-red-600">
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{s.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{s.desc}</div>
+                    </div>
+                    <span className="text-xs font-bold text-red-600 dark:text-red-400 shrink-0 ml-4">
                       {s.value}
                     </span>
                   </div>
@@ -855,12 +1279,77 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
           </div>
         </section>
 
+        {/* Step 6: Customer Requirements */}
+        <section className="bg-card rounded-lg border overflow-hidden">
+          <StepHeader label="6 · Customer Requirements" meta="Editable — included in SoW PDF" />
+          <div className="p-4 space-y-2">
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Items the customer must provide before delivery begins. Add, edit, or remove as needed.
+            </p>
+            {customerRequirements.map((req, idx) => (
+              <div key={idx} className="flex items-center gap-2 group">
+                <span className="text-primary font-bold text-xs">•</span>
+                <input
+                  type="text"
+                  value={req}
+                  onChange={(e) => {
+                    const updated = [...customerRequirements];
+                    updated[idx] = e.target.value;
+                    setCustomerRequirements(updated);
+                  }}
+                  className="flex-1 text-xs bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none py-1 transition-colors"
+                />
+                <button
+                  className="w-5 h-5 text-muted-foreground/30 hover:text-red-500 hover:bg-red-50 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setCustomerRequirements(customerRequirements.filter((_, i) => i !== idx))}
+                  title="Remove"
+                >×</button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 mt-3">
+              <Plus className="size-3 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Add a requirement…"
+                value={newRequirement}
+                onChange={(e) => setNewRequirement(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newRequirement.trim()) {
+                    setCustomerRequirements([...customerRequirements, newRequirement.trim()]);
+                    setNewRequirement("");
+                  }
+                }}
+                className="flex-1 text-xs bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-primary focus:outline-none py-1 placeholder:text-muted-foreground/40"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[10px] h-6 px-2"
+                disabled={!newRequirement.trim()}
+                onClick={() => {
+                  if (newRequirement.trim()) {
+                    setCustomerRequirements([...customerRequirements, newRequirement.trim()]);
+                    setNewRequirement("");
+                  }
+                }}
+              >Add</Button>
+            </div>
+            {customerRequirements.length !== DEFAULT_CUSTOMER_REQUIREMENTS.length ||
+              customerRequirements.some((r, i) => r !== DEFAULT_CUSTOMER_REQUIREMENTS[i]) ? (
+              <button
+                className="text-[10px] text-primary font-semibold hover:underline mt-1"
+                onClick={() => setCustomerRequirements([...DEFAULT_CUSTOMER_REQUIREMENTS])}
+              >↻ Reset to defaults</button>
+            ) : null}
+          </div>
+        </section>
+
         <div className="h-24 shrink-0" />
         </div>
       </div>
 
       {/* Sticky action bar */}
-      <div className="absolute bottom-0 left-0 right-[400px] bg-card/95 backdrop-blur-sm border-t px-6 py-3 flex items-center justify-between z-30">
+      <div className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t px-6 py-3 flex items-center justify-between z-30">
         <div className="text-xs">
           {clientName ? (
             <span className="text-muted-foreground">{clientName} · {selectedTier?.name ?? "India"} · {gmEnabled ? "Gen Media" : ""}{gmEnabled && mkEnabled ? " + " : ""}{mkEnabled ? "Marketing" : ""}</span>
@@ -871,20 +1360,46 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
         </div>
         <div className="flex gap-3">
           <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={handleResetAll}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </Button>
+          <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              const draft = { clientName, brandName, buyerName, salesDri, selectedTierKey, gmEnabled, mkEnabled, gmPlanType, mkPlanType, selectedGmTier, selectedMkTier, alacarteQtys, campaignQtys, strategicQtys, discount, upfront, months };
-              localStorage.setItem("sow_draft", JSON.stringify(draft));
-              toast.success("Draft saved locally");
+            disabled={saving || !clientName.trim()}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const rowData = buildSaveData(sowId ? undefined! : await getNextSowRef());
+
+                if (sowId) {
+                  const { sow_ref: _, ...updates } = rowData;
+                  await updateSow(sowId, updates);
+                } else {
+                  const created = await createSow(rowData as Parameters<typeof createSow>[0]);
+                  setSowId(created.id);
+                }
+                setLastSaved(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+                toast.success("Draft saved");
+                onSaved?.();
+              } catch {
+                toast.error("Failed to save draft");
+              } finally {
+                setSaving(false);
+              }
             }}
           >
-            Save Draft
+            {saving ? "Saving..." : "Save Draft"}
           </Button>
           <Button
             size="sm"
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            disabled={!clientName.trim() || !buyerName.trim() || !salesDri.trim()}
+            disabled={!clientName.trim() || !buyerName.trim() || !salesDri.trim() || (gmEnabled && gmPlanType === "volume" && !selectedGmTier) || (mkEnabled && mkPlanType === "brand" && !selectedMkTier)}
             onClick={() => {
               const now = new Date();
               setSowRef(`FS-SOW-${now.getFullYear()}-${String(Math.floor(Math.random()*999)+1).padStart(3,"0")}`);
@@ -898,14 +1413,14 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
       </div>
 
       {/* ========== RIGHT: LIVE PREVIEW ========== */}
-      <div className="w-[400px] shrink-0 flex flex-col overflow-hidden border-l bg-muted/20">
-        <div className="px-4 py-3 text-xs font-bold flex items-center justify-between shrink-0 border-b bg-card">
+      <div className="w-[380px] shrink-0 flex flex-col overflow-hidden mt-5 mb-16 mr-0 bg-card border rounded-xl shadow-sm">
+        <div className="px-4 py-3 text-xs font-bold flex items-center justify-between shrink-0 border-b">
           <span className="text-foreground">Live preview</span>
           <span className="font-normal text-muted-foreground text-[11px]">
             {selectedTier.name} &middot; {currency} &middot; {multiplier}&times;
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-3 space-y-3 bg-muted/30">
           {!clientName.trim() && !buyerName.trim() ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -937,14 +1452,43 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                 "No services selected"}
             </div>
             {gmEnabled && gmPlanType === "volume" && (
-              <div className="bg-muted/50 rounded-lg border p-3 text-[11px] text-muted-foreground space-y-1">
-                <div className="font-semibold text-foreground text-xs mb-1">
-                  {items.find((i) => i.item_key === selectedGmTier)?.name} plan
-                  deliverables
+              selectedGmTier ? (
+                <div className="bg-muted/50 rounded-lg border p-3 text-[11px] text-muted-foreground space-y-1">
+                  <div className="font-semibold text-foreground text-xs mb-1">
+                    {items.find((i) => i.item_key === selectedGmTier)?.name} plan
+                    deliverables
+                  </div>
+                  <p className="text-muted-foreground italic">
+                    {items.find((i) => i.item_key === selectedGmTier)?.notes}
+                  </p>
                 </div>
-                <p className="text-muted-foreground italic">
-                  {items.find((i) => i.item_key === selectedGmTier)?.notes}
-                </p>
+              ) : (
+                <div className="bg-muted/50 rounded-lg border p-3 text-[11px] text-muted-foreground italic text-center py-6">
+                  Select a Gen Media retainer plan
+                </div>
+              )
+            )}
+            {gmEnabled && gmPlanType === "volume" && alacarteItems.filter(i => (alacarteQtys[i.item_key] ?? 0) > 0).length > 0 && (
+              <div className="bg-muted/50 rounded-lg border overflow-hidden mt-2">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b bg-muted/30">À la carte add-ons</div>
+                {alacarteItems
+                  .filter((item) => (alacarteQtys[item.item_key] ?? 0) > 0)
+                  .map((item) => {
+                    const qty = alacarteQtys[item.item_key] ?? 0;
+                    const total = qty * price(item.base_inr);
+                    return (
+                      <div
+                        key={item.item_key}
+                        className="flex justify-between px-3 py-1.5 border-b last:border-0 text-[11px]"
+                      >
+                        <span className="text-foreground">{item.name}</span>
+                        <span className="font-semibold">
+                          {qty} &times; {fmtPrice(price(item.base_inr), symbol)}{" "}
+                          = {fmtPrice(total, symbol)}
+                        </span>
+                      </div>
+                    );
+                  })}
               </div>
             )}
             {gmEnabled && gmPlanType === "alacarte" && (
@@ -1006,9 +1550,14 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                 <div className="border-t pt-2 mt-2">
                   <div className="flex justify-between text-sm font-bold">
                     <span className="text-foreground">Net monthly</span>
-                    <span className="text-primary">
-                      {fmtPrice(Math.round(netMonthly), symbol)}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-primary">
+                        {fmtPrice(Math.round(netMonthly), symbol)}
+                      </span>
+                      {formatLocal(Math.round(netMonthly), currency, selectedCountry) && (
+                        <div className="text-[10px] font-normal text-muted-foreground">{formatLocal(Math.round(netMonthly), currency, selectedCountry)}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1120,12 +1669,6 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
           )}
         </div>
 
-        {/* Preview footer */}
-        <div className="border-t px-4 py-2.5 bg-card shrink-0">
-          <div className="text-[10px] text-muted-foreground text-center">
-            Rate card {version.version_label} · {currency} · {selectedTier?.name}
-          </div>
-        </div>
       </div>
 
       {/* ========== SOW DOCUMENT MODAL ========== */}
@@ -1136,12 +1679,89 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
             <div className="sticky top-0 bg-card border-b px-6 py-3 flex items-center justify-between z-10 sow-modal-header">
               <div className="text-sm font-bold text-foreground">SoW Document Preview</div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.print()}>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={async () => {
+                  if (!sowId) {
+                    try {
+                      const rowData = buildSaveData(await getNextSowRef());
+                      const created = await createSow(rowData as Parameters<typeof createSow>[0]);
+                      setSowId(created.id);
+                      onSaved?.();
+                    } catch {}
+                  }
+                  const services = [gmEnabled ? gmScopeLabel : "", mkEnabled ? mkScopeLabel : ""].filter(Boolean).join(" + ");
+                  const printWindow = window.open("", "_blank");
+                  if (!printWindow) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
+                  const alacarteAddonsForPdf = alacarteItems
+                    .filter(i => (alacarteQtys[i.item_key] ?? 0) > 0)
+                    .map(i => ({ item_key: i.item_key, name: i.name, qty: alacarteQtys[i.item_key], unit_price: price(i.base_inr), length: i.length ?? undefined }));
+                  const gmDelivsForPdf = gmEnabled && gmPlanType === "volume" && selectedGmTier ? getDeliverables(selectedGmTier) : [];
+                  const mkDelivsForPdf = mkEnabled && mkPlanType === "brand" && selectedMkTier ? getDeliverables(selectedMkTier) : [];
+                  const gmTierNotes = gmEnabled && gmPlanType === "volume" ? items.find(i => i.item_key === selectedGmTier)?.notes : null;
+                  const mkTierNotes = mkEnabled && mkPlanType === "brand" ? items.find(i => i.item_key === selectedMkTier)?.notes : null;
+                  const gmTierNameForPdf = items.find(i => i.item_key === selectedGmTier)?.name;
+                  const mkTierNameForPdf = items.find(i => i.item_key === selectedMkTier)?.name;
+                  printWindow.document.write(generateSowPdfHtml({
+                    sowRef,
+                    clientName,
+                    brandName,
+                    buyerName,
+                    salesDri,
+                    tierName: selectedTier?.name ?? "",
+                    currency,
+                    symbol,
+                    services,
+                    gmPlanType,
+                    mkPlanType,
+                    discount,
+                    upfront,
+                    months,
+                    netMonthly: Math.round(netMonthly),
+                    annualValue: Math.round(annualValue),
+                    listMonthly: Math.round(listMonthly),
+                    bundleDiscount: Math.round(bundleDiscount),
+                    customerRequirements,
+                    alacarteAddons: alacarteAddonsForPdf,
+                    scopeSnapshot: {
+                      gmDeliverables: gmDelivsForPdf.length > 0 ? gmDelivsForPdf : undefined,
+                      mkDeliverables: mkDelivsForPdf.length > 0 ? mkDelivsForPdf : undefined,
+                      gmTierName: gmTierNameForPdf,
+                      mkTierName: mkTierNameForPdf,
+                      tierNotes: [gmTierNotes, mkTierNotes].filter(Boolean).join(" | ") || undefined,
+                    },
+                  }));
+                  printWindow.document.close();
+                  setTimeout(() => printWindow.print(), 400);
+                }}>
                   <Printer className="h-3.5 w-3.5" />
                   Print / Save PDF
                 </Button>
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5" onClick={() => { toast.success("SoW saved as draft"); setSowModalOpen(false); }}>
-                  Save as Draft
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                  disabled={saving}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      const rowData = buildSaveData(sowId ? undefined! : await getNextSowRef());
+
+                      if (sowId) {
+                        const { sow_ref: _, ...updates } = rowData;
+                        await updateSow(sowId, updates);
+                      } else {
+                        const created = await createSow(rowData as Parameters<typeof createSow>[0]);
+                        setSowId(created.id);
+                      }
+                      toast.success("SoW saved as draft");
+                      setSowModalOpen(false);
+                      onSaved?.();
+                    } catch {
+                      toast.error("Failed to save draft");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {saving ? "Saving..." : "Save as Draft"}
                 </Button>
                 <button onClick={() => setSowModalOpen(false)} className="text-muted-foreground hover:text-foreground ml-2" aria-label="Close">
                   <X className="h-5 w-5" />
@@ -1149,15 +1769,40 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
               </div>
             </div>
 
+            {/* Logo upload bar */}
+            <div className="px-6 py-3 border-b flex items-center gap-3">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">Customer logo</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="text-xs"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setLogoDataUrl(reader.result as string);
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {logoDataUrl && (
+                <button className="text-xs text-destructive hover:underline" onClick={() => setLogoDataUrl(null)}>Remove</button>
+              )}
+            </div>
+
             {/* SoW Document */}
             <div className="p-8 print-area" id="sow-print-content">
               {/* Header */}
               <div className="flex items-start justify-between border-b-2 border-foreground pb-4 mb-6">
                 <div>
-                  <div className="text-3xl font-black text-foreground">FYND STUDIO</div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={FYND_STUDIOS_LOGO} alt="Fynd Studios" className="h-8" />
                   <div className="text-xs text-muted-foreground mt-1">AI-native creative · Mumbai · Bangalore · Dubai</div>
                 </div>
                 <div className="text-right">
+                  {logoDataUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoDataUrl} alt="Customer logo" className="max-h-16 max-w-[200px] mb-2 ml-auto" />
+                  )}
                   <div className="text-lg font-bold text-primary">{clientName || "Client"}</div>
                   <div className="text-xs text-muted-foreground">{brandName}</div>
                 </div>
@@ -1183,39 +1828,143 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
 
               {/* Scope */}
               <h3 className="text-lg font-bold text-foreground mb-3">1 · Scope & Deliverables</h3>
-              <table className="w-full mb-6 text-sm border border-border">
+              <table className="w-full mb-3 text-sm border border-border">
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="py-2 px-3 text-left border border-border font-semibold">Deliverable</th>
-                    <th className="py-2 px-3 text-center border border-border font-semibold w-20">Qty</th>
                     <th className="py-2 px-3 text-center border border-border font-semibold w-20">Unit</th>
-                    <th className="py-2 px-3 text-right border border-border font-semibold w-24">SLA</th>
+                    <th className="py-2 px-3 text-center border border-border font-semibold w-16">Qty</th>
+                    <th className="py-2 px-3 text-right border border-border font-semibold w-28">Unit price</th>
+                    <th className="py-2 px-3 text-right border border-border font-semibold w-28">Line total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {gmEnabled && gmPlanType === "volume" && (() => {
                     const tier = items.find(i => i.item_key === selectedGmTier);
                     if (!tier) return null;
-                    const deliverables = [
-                      { name: `${tier.name} — Volume Retainer`, qty: "1", unit: "/ mo", sla: tier.sla || "—" },
-                    ];
-                    return deliverables.map((d, i) => (
-                      <tr key={i}><td className="py-1.5 px-3 border border-border">{d.name}</td><td className="py-1.5 px-3 text-center border border-border">{d.qty}</td><td className="py-1.5 px-3 text-center border border-border">{d.unit}</td><td className="py-1.5 px-3 text-right border border-border">{d.sla}</td></tr>
-                    ));
+                    return (
+                      <tr>
+                        <td className="py-1.5 px-3 border border-border">{tier.name} — Volume Retainer</td>
+                        <td className="py-1.5 px-3 text-center border border-border">/ mo</td>
+                        <td className="py-1.5 px-3 text-center border border-border">1</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(tier.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(price(tier.base_inr), symbol)}</td>
+                      </tr>
+                    );
                   })()}
-                  {gmEnabled && gmPlanType === "alacarte" && alacarteItems.filter(i => (alacarteQtys[i.item_key] ?? 0) > 0).map(item => (
-                    <tr key={item.item_key}><td className="py-1.5 px-3 border border-border">{item.name}</td><td className="py-1.5 px-3 text-center border border-border">{alacarteQtys[item.item_key]}</td><td className="py-1.5 px-3 text-center border border-border">{item.length ?? "—"}</td><td className="py-1.5 px-3 text-right border border-border">{item.sla ?? "—"}</td></tr>
-                  ))}
+                  {gmEnabled && gmPlanType === "volume" && alacarteItems.filter(i => (alacarteQtys[i.item_key] ?? 0) > 0).map(item => {
+                    const qty = alacarteQtys[item.item_key] ?? 0;
+                    return (
+                      <tr key={item.item_key}>
+                        <td className="py-1.5 px-3 border border-border text-muted-foreground">{item.name} (add-on)</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{item.length ?? "—"}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{qty}</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(item.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(qty * price(item.base_inr), symbol)}</td>
+                      </tr>
+                    );
+                  })}
+                  {gmEnabled && gmPlanType === "alacarte" && alacarteItems.filter(i => (alacarteQtys[i.item_key] ?? 0) > 0).map(item => {
+                    const qty = alacarteQtys[item.item_key] ?? 0;
+                    return (
+                      <tr key={item.item_key}>
+                        <td className="py-1.5 px-3 border border-border">{item.name}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{item.length ?? "—"}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{qty}</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(item.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(qty * price(item.base_inr), symbol)}</td>
+                      </tr>
+                    );
+                  })}
                   {gmEnabled && gmPlanType === "pilot" && pilotItem && (
-                    <tr><td className="py-1.5 px-3 border border-border">14 Day Pilot Sprint</td><td className="py-1.5 px-3 text-center border border-border">1</td><td className="py-1.5 px-3 text-center border border-border">14 days</td><td className="py-1.5 px-3 text-right border border-border">14 days</td></tr>
+                    <tr>
+                      <td className="py-1.5 px-3 border border-border">14 Day Pilot Sprint</td>
+                      <td className="py-1.5 px-3 text-center border border-border">14 days</td>
+                      <td className="py-1.5 px-3 text-center border border-border">1</td>
+                      <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(pilotItem.base_inr), symbol)}</td>
+                      <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(price(pilotItem.base_inr), symbol)}</td>
+                    </tr>
                   )}
                   {mkEnabled && mkPlanType === "brand" && (() => {
                     const tier = items.find(i => i.item_key === selectedMkTier);
                     if (!tier) return null;
-                    return <tr><td className="py-1.5 px-3 border border-border">{tier.name} — Brand Retainer</td><td className="py-1.5 px-3 text-center border border-border">1</td><td className="py-1.5 px-3 text-center border border-border">/ mo</td><td className="py-1.5 px-3 text-right border border-border">{tier.sla ?? "—"}</td></tr>;
+                    return (
+                      <tr>
+                        <td className="py-1.5 px-3 border border-border">{tier.name} — Brand Retainer</td>
+                        <td className="py-1.5 px-3 text-center border border-border">/ mo</td>
+                        <td className="py-1.5 px-3 text-center border border-border">1</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(tier.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(price(tier.base_inr), symbol)}</td>
+                      </tr>
+                    );
                   })()}
+                  {mkEnabled && mkPlanType === "campaign" && campaignItems.filter(i => (campaignQtys[i.item_key] ?? 0) > 0).map(item => {
+                    const qty = campaignQtys[item.item_key] ?? 0;
+                    return (
+                      <tr key={item.item_key}>
+                        <td className="py-1.5 px-3 border border-border">{item.name}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{item.length ?? "—"}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{qty}</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(item.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(qty * price(item.base_inr), symbol)}</td>
+                      </tr>
+                    );
+                  })}
+                  {mkEnabled && mkPlanType === "strategic" && strategicItems.filter(i => (strategicQtys[i.item_key] ?? 0) > 0).map(item => {
+                    const qty = strategicQtys[item.item_key] ?? 0;
+                    return (
+                      <tr key={item.item_key}>
+                        <td className="py-1.5 px-3 border border-border">{item.name}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{item.length ?? "—"}</td>
+                        <td className="py-1.5 px-3 text-center border border-border">{qty}</td>
+                        <td className="py-1.5 px-3 text-right border border-border">{fmtPrice(price(item.base_inr), symbol)}</td>
+                        <td className="py-1.5 px-3 text-right border border-border font-semibold">{fmtPrice(qty * price(item.base_inr), symbol)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              {gmEnabled && gmPlanType === "volume" && (() => {
+                const tier = items.find(i => i.item_key === selectedGmTier);
+                return tier?.notes ? <div className="bg-muted/30 border rounded px-3 py-2 text-xs text-muted-foreground mb-3"><strong>Scope:</strong> {tier.notes}</div> : null;
+              })()}
+              {mkEnabled && mkPlanType === "brand" && (() => {
+                const tier = items.find(i => i.item_key === selectedMkTier);
+                return tier?.notes ? <div className="bg-muted/30 border rounded px-3 py-2 text-xs text-muted-foreground mb-3"><strong>Scope:</strong> {tier.notes}</div> : null;
+              })()}
+              {/* Consolidated deliverables — grouped by service */}
+              {(() => {
+                const gmDelivs = gmEnabled && gmPlanType === "volume" && selectedGmTier ? getDeliverables(selectedGmTier) : [];
+                const mkDelivs = mkEnabled && mkPlanType === "brand" && selectedMkTier ? getDeliverables(selectedMkTier) : [];
+                if (gmDelivs.length === 0 && mkDelivs.length === 0) return null;
+                const gmTierName = items.find(i => i.item_key === selectedGmTier)?.name;
+                const mkTierName = items.find(i => i.item_key === selectedMkTier)?.name;
+                return (
+                  <div className="text-sm mb-6">
+                    <strong>Deliverables included:</strong>
+                    {gmDelivs.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs font-semibold text-primary mb-1">Gen Media — {gmTierName}</div>
+                        <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
+                          {gmDelivs.map((d, i) => (
+                            <li key={i}>{d.label}: <strong className="text-foreground">{d.qty}{d.unit ? ` ${d.unit}` : ""}</strong></li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {mkDelivs.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs font-semibold text-primary mb-1">Marketing — {mkTierName}</div>
+                        <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
+                          {mkDelivs.map((d, i) => (
+                            <li key={i}>{d.label}: <strong className="text-foreground">{d.qty}{d.unit ? ` ${d.unit}` : ""}</strong></li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Commercials */}
               <h3 className="text-lg font-bold text-foreground mb-3">2 · Commercials</h3>
@@ -1225,7 +1974,7 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                   {bundleDiscount > 0 && <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">Bundle discount (10%)</td><td className="py-1.5 px-3 border border-border text-right text-red-600">−{fmtPrice(bundleDiscount, symbol)}</td></tr>}
                   {discount > 0 && <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">Negotiated discount ({discount}%)</td><td className="py-1.5 px-3 border border-border text-right text-red-600">−{fmtPrice(Math.round((listMonthly - bundleDiscount) * discount / 100), symbol)}</td></tr>}
                   {upfront > 0 && <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">Upfront commitment ({upfront}% off)</td><td className="py-1.5 px-3 border border-border text-right text-red-600">−{fmtPrice(Math.round(netMonthly * upfront / (100 - upfront)), symbol)}</td></tr>}
-                  <tr className="bg-primary/10"><td className="py-2 px-3 border border-border font-bold text-primary">Net monthly retainer</td><td className="py-2 px-3 border border-border text-right font-bold text-primary text-lg">{fmtPrice(netMonthly, symbol)}</td></tr>
+                  <tr className="bg-primary/10"><td className="py-2 px-3 border border-border font-bold text-primary">Net monthly retainer</td><td className="py-2 px-3 border border-border text-right font-bold text-primary text-lg">{fmtPrice(netMonthly, symbol)}{formatLocal(Math.round(netMonthly), currency, selectedCountry) && <div className="text-xs font-normal text-muted-foreground">{formatLocal(Math.round(netMonthly), currency, selectedCountry)}</div>}</td></tr>
                 </tbody>
               </table>
               <table className="w-full mb-6 text-sm border border-border">
@@ -1248,10 +1997,16 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                   </tr>
                 </tbody>
               </table>
+              <p className="text-sm text-foreground mb-6">
+                <strong>Payment schedule:</strong>{" "}
+                Monthly in advance on the 1st · Net-15.
+                {upfront === 5 && " Upfront commitment: quarterly."}
+                {upfront === 10 && " Upfront commitment: annual."}
+              </p>
 
               {/* SLAs */}
               <h3 className="text-lg font-bold text-foreground mb-3">3 · Service Level Agreements</h3>
-              <table className="w-full mb-6 text-sm border border-border">
+              <table className="w-full mb-3 text-sm border border-border">
                 <tbody>
                   <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">First delivery</td><td className="py-1.5 px-3 border border-border font-semibold">48 hours from brief lock</td></tr>
                   <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">Revision turnaround</td><td className="py-1.5 px-3 border border-border font-semibold">24 hours</td></tr>
@@ -1259,28 +2014,39 @@ export function SoWBuilderClient({ version, tiers, items }: Props) {
                   <tr><td className="py-1.5 px-3 border border-border text-muted-foreground">Escalation</td><td className="py-1.5 px-3 border border-border font-semibold">Account lead within 4 hours</td></tr>
                 </tbody>
               </table>
+              <p className="text-xs text-muted-foreground mb-6">First-delivery SLA measured from receipt of complete customer inputs and signed PO.</p>
+
+              {/* Customer Inputs */}
+              <h3 className="text-lg font-bold text-foreground mb-3">4 · Customer Inputs</h3>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-foreground mb-3">
+                {customerRequirements.map((req, idx) => (
+                  <li key={idx}>{req}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mb-6">Delays in customer inputs may extend delivery SLA proportionally.</p>
 
               {/* Surcharges */}
-              <h3 className="text-lg font-bold text-foreground mb-3">4 · Surcharges & Standard Terms</h3>
+              <h3 className="text-lg font-bold text-foreground mb-3">5 · Surcharges & Standard Terms</h3>
               <ul className="list-disc pl-5 space-y-1 text-sm text-foreground mb-6">
                 <li>Same-day rush (&lt;12 hr SLA): <strong>+30%</strong> on list. Not discountable.</li>
                 <li>Scope change after storyboard approval: up to <strong>+50%</strong> of asset cost.</li>
                 <li>Major brief change after delivery: up to <strong>+100%</strong> of asset cost.</li>
                 <li>Talent / branded music licensing: pass-through at <strong>cost +15%</strong> admin.</li>
                 <li>Additional language packs: <strong>+25%</strong> of base per language beyond included.</li>
-                <li>Payment: Net-15 retainers · Net-30 à la carte · 5% off quarterly · 10% off annual.</li>
+                <li>Payment: Net-15 retainers · Net-30 à la carte · 5% off quarterly upfront · 10% off annual upfront.</li>
+                <li>Collection target: <strong>&le; 60 days</strong> PO-to-bank.</li>
               </ul>
 
               {/* Notes */}
               {sowNotes && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-bold text-foreground mb-2">5 · Additional Notes</h3>
+                  <h3 className="text-lg font-bold text-foreground mb-2">6 · Additional Notes</h3>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">{sowNotes}</p>
                 </div>
               )}
 
               {/* Signatures */}
-              <h3 className="text-lg font-bold text-foreground mb-4">{sowNotes ? "6" : "5"} · Signatures</h3>
+              <h3 className="text-lg font-bold text-foreground mb-4">{sowNotes ? "7" : "6"} · Signatures</h3>
               <div className="grid grid-cols-2 gap-8">
                 <div>
                   <div className="border-b-2 border-muted-foreground h-16 mb-2" />
@@ -1389,25 +2155,36 @@ function PlanTabs({
 function TierCard({
   name,
   price: priceStr,
+  localPrice,
   unit,
   sla,
   notes,
   active,
   onClick,
+  deliverables,
+  onDelivQtyChange,
+  onDelivRemove,
+  onReset,
+  hasCustom,
 }: {
   name: string;
   price: string;
+  localPrice?: string | null;
   unit: string;
   sla: string;
   notes?: string;
   active: boolean;
   onClick: () => void;
+  deliverables?: { id: string; label: string; qty: string | number; unit: string; editable: boolean }[];
+  onDelivQtyChange?: (id: string, qty: number) => void;
+  onDelivRemove?: (id: string) => void;
+  onReset?: () => void;
+  hasCustom?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <div
       className={cn(
-        "relative border-2 rounded-lg p-4 text-left transition-all",
+        "relative border-2 rounded-lg p-4 text-left transition-all cursor-pointer flex flex-col",
         active
           ? "border-primary bg-primary/10 shadow-md"
           : "border-border hover:border-primary hover:bg-muted/30 hover:shadow-sm",
@@ -1428,11 +2205,94 @@ function TierCard({
           {unit}
         </span>
       </div>
-      <div className="text-[11px] text-muted-foreground italic mt-1">{sla}</div>
-      {notes && (
-        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{notes}</p>
+      {localPrice && <div className="text-[11px] text-muted-foreground">{localPrice} {unit}</div>}
+      {deliverables && deliverables.length > 0 && (
+        <ul className="mt-2 space-y-1 flex-1" onClick={(e) => e.stopPropagation()}>
+          {deliverables.map((d) => (
+            <li key={d.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="text-primary font-bold">•</span>
+              <span className="flex-1">{d.label}</span>
+              {d.editable && typeof d.qty === "number" ? (
+                <input
+                  type="number"
+                  min={0}
+                  className="w-12 h-5 px-1 text-[11px] text-center border rounded bg-card text-primary font-bold"
+                  value={d.qty}
+                  onChange={(e) => onDelivQtyChange?.(d.id, Math.max(0, Number(e.target.value)))}
+                />
+              ) : (
+                <span className="text-primary font-semibold text-[11px]">{d.qty}</span>
+              )}
+              {d.unit && <span className="text-[10px]">{d.unit}</span>}
+              <button
+                className="w-4 h-4 text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 rounded text-xs leading-none"
+                onClick={() => onDelivRemove?.(d.id)}
+                title="Remove"
+              >×</button>
+            </li>
+          ))}
+        </ul>
       )}
-    </button>
+      <div className="text-[11px] text-muted-foreground italic mt-2">{sla}</div>
+      {hasCustom && onReset && (
+        <button
+          className="mt-1 text-[10px] text-primary font-semibold hover:underline self-start"
+          onClick={(e) => { e.stopPropagation(); onReset(); }}
+        >↻ Reset to defaults</button>
+      )}
+    </div>
+  );
+}
+
+function AnnualMasterCard({
+  item,
+  price: priceStr,
+  localPrice,
+  active,
+  onClick,
+  deliverables,
+}: {
+  item: RateCardItem;
+  price: string;
+  localPrice?: string | null;
+  active: boolean;
+  onClick: () => void;
+  deliverables: { id: string; label: string; qty: string | number; unit: string; editable: boolean }[];
+}) {
+  return (
+    <div
+      className={cn(
+        "border-2 rounded-xl p-4 cursor-pointer transition-all grid grid-cols-[1fr_1.2fr] gap-4",
+        "bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20",
+        active
+          ? "border-primary shadow-md"
+          : "border-border hover:border-primary",
+      )}
+      onClick={onClick}
+      role="radio"
+      aria-checked={active}
+    >
+      <div className="flex flex-col justify-between">
+        <div>
+          <div className="text-base font-bold text-foreground">{item.name}</div>
+          <div className="text-xl font-extrabold text-primary mt-1">{priceStr} <span className="text-[11px] font-normal text-muted-foreground">{item.unit ?? "/ mo"}</span></div>
+          {localPrice && <div className="text-[11px] text-muted-foreground">{localPrice}</div>}
+          {item.notes && <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{item.notes}</p>}
+        </div>
+        <div className="text-[11px] text-muted-foreground italic mt-2">SLA: {item.sla}</div>
+      </div>
+      <div className="bg-card border rounded-lg p-3 shadow-sm">
+        <div className="text-[11px] font-bold text-primary uppercase tracking-wider mb-2 pb-1.5 border-b">Included deliverables</div>
+        <ul className="space-y-1">
+          {deliverables.map((d) => (
+            <li key={d.id} className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>• {d.label}</span>
+              <span className="text-primary font-semibold ml-2 shrink-0">{d.qty}{d.unit ? ` ${d.unit}` : ""}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -1491,7 +2351,9 @@ function AlacarteTable({
                   type="number"
                   min={0}
                   className="w-14 h-7 px-1.5 text-xs text-center border rounded bg-card text-primary font-bold focus:outline-emerald-500"
-                  value={qty}
+                  value={qty || ""}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) =>
                     setQtys((prev) => ({
                       ...prev,
@@ -1566,7 +2428,9 @@ function QtyItemList({
               type="number"
               min={0}
               className="w-14 h-7 px-1.5 text-xs text-center border rounded bg-card text-primary font-bold focus:outline-emerald-500"
-              value={qty}
+              value={qty || ""}
+              placeholder="0"
+              onFocus={(e) => e.target.select()}
               onChange={(e) =>
                 setQtys((prev) => ({
                   ...prev,

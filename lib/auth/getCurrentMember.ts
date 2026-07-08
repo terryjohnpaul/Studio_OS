@@ -2,6 +2,14 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Member } from "@/lib/types/members";
 
+export async function requireWriteAccess(): Promise<Member> {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Authentication required");
+  if (member.role === "viewer") throw new Error("You have view-only access. Contact your admin for full access.");
+  if (member.status === "disabled") throw new Error("Your account has been disabled");
+  return member;
+}
+
 /**
  * Get or create the current member record.
  * First Clerk user to visit becomes Owner.
@@ -34,7 +42,7 @@ export async function getCurrentMember(): Promise<Member | null> {
     .from("members")
     .select("*", { count: "exact", head: true });
 
-  const role = (count === null || count === 0) ? "owner" : "member";
+  const role = (count === null || count === 0) ? "owner" : "viewer";
 
   // Create the member record
   const { data: newMember, error } = await supabase

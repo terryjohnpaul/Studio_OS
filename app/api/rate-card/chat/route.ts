@@ -2,11 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { buildPricingContext } from "@/lib/rate-card/pricing-context";
 import { MOCK_VERSION, MOCK_TIERS, MOCK_ITEMS } from "@/lib/rate-card/mock-data";
-import path from "path";
 
 const PROJECT_ID = process.env.VERTEX_AI_PROJECT || "fynd-jio-impetus-non-prod";
 const LOCATION = "us-east5";
 const MODEL = "claude-sonnet-4@20250514";
+
+function getAuthClient() {
+  const credsJson = process.env.GOOGLE_CREDENTIALS;
+  if (credsJson) {
+    const credentials = JSON.parse(credsJson);
+    return new GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+    });
+  }
+  return new GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,11 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const credPath = path.resolve(process.cwd(), "gcp-credentials.json");
-    const auth = new GoogleAuth({
-      keyFilename: credPath,
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-    });
+    const auth = getAuthClient();
     const client = await auth.getClient();
 
     const pricingContext = buildPricingContext(MOCK_VERSION, MOCK_TIERS, MOCK_ITEMS);

@@ -15,13 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -31,11 +31,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Receipt, Search, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Plus, Receipt, Search, Trash2, Paperclip, X, CalendarIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import {
   getExpenses,
   createExpense,
   deleteExpense,
+  uploadExpenseReceipt,
   getExpenseSummary,
   getActiveProjects,
 } from "../actions";
@@ -74,6 +78,7 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
   const [formPaymentMethod, setFormPaymentMethod] = useState<PaymentMethod>("bank_transfer");
   const [formProjectId, setFormProjectId] = useState("__none__");
   const [formDescription, setFormDescription] = useState("");
+  const [formReceipt, setFormReceipt] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -104,6 +109,12 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
     if (!formAmount || Number(formAmount) <= 0) return;
     setCreating(true);
     try {
+      let receiptUrl: string | null = null;
+      if (formReceipt) {
+        const fd = new FormData();
+        fd.append("file", formReceipt);
+        receiptUrl = await uploadExpenseReceipt(fd);
+      }
       const exp = await createExpense({
         date: formDate,
         amount: Number(formAmount),
@@ -112,6 +123,7 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
         payment_method: formPaymentMethod,
         project_id: formProjectId !== "__none__" ? formProjectId : null,
         description: formDescription || null,
+        receipt_url: receiptUrl,
       });
       setExpenses((prev) => [exp, ...prev]);
       setFormOpen(false);
@@ -142,6 +154,7 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
     setFormPaymentMethod("bank_transfer");
     setFormProjectId("__none__");
     setFormDescription("");
+    setFormReceipt(null);
   }
 
   const filtered = expenses.filter((e) => {
@@ -253,22 +266,35 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
         </div>
       )}
 
-      {/* Add Expense Dialog */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Expense</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
+      {/* Add Expense Sheet */}
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
+        <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Add Expense</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 px-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">Amount (₹) *</Label>
-                <Input type="number" value={formAmount} onChange={(e) => setFormAmount(e.target.value)}
+                <Input type="text" inputMode="decimal" value={formAmount}
+                  onChange={(e) => { const v = e.target.value; if (/^\d*\.?\d*$/.test(v)) setFormAmount(v); }}
                   placeholder="0" className="h-9" autoFocus />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">Date</Label>
-                <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-9" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !formDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                      {formDate ? format(parseISO(formDate), "dd MMM yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={formDate ? parseISO(formDate) : undefined}
+                      onSelect={(d) => { if (d) setFormDate(format(d, "yyyy-MM-dd")); }}
+                      initialFocus />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">Category</Label>
@@ -295,7 +321,7 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
               <div className="space-y-1.5 col-span-2">
                 <Label className="text-sm">Project (optional)</Label>
                 <Select value={formProjectId} onValueChange={setFormProjectId}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="No project" /></SelectTrigger>
+                  <SelectTrigger className="h-9 w-full"><SelectValue placeholder="No project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">General (no project)</SelectItem>
                     {projects.map((p) => (
@@ -311,16 +337,36 @@ export function ExpensesClient({ initialExpenses, initialProjects, initialSummar
                 <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="What was this for?" rows={2} />
               </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label className="text-sm">Bill / Receipt</Label>
+                {formReceipt ? (
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate flex-1">{formReceipt.name}</span>
+                    <button type="button" onClick={() => setFormReceipt(null)}
+                      className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Attach bill or receipt</span>
+                    <input type="file" className="hidden" accept="image/*,.pdf"
+                      onChange={(e) => { if (e.target.files?.[0]) setFormReceipt(e.target.files[0]); }} />
+                  </label>
+                )}
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="ghost" size="sm">Cancel</Button></DialogClose>
+          <SheetFooter>
+            <SheetClose asChild><Button variant="ghost" size="sm">Cancel</Button></SheetClose>
             <Button size="sm" onClick={handleCreate} disabled={creating || !formAmount || Number(formAmount) <= 0}>
               {creating ? "Saving..." : "Add Expense"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

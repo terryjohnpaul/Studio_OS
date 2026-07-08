@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMember } from "@/lib/auth/getCurrentMember";
+import { getCurrentMember, requireWriteAccess } from "@/lib/auth/getCurrentMember";
 import { revalidatePath } from "next/cache";
 import type { TaskPriority } from "@/lib/types/tasks";
 import { getClientOptions, getActiveMembers, generateSignedUrls, isCompletionColumn } from "@/lib/data/shared-lookups";

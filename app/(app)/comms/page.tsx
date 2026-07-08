@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { MessageSquareText } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { CommsShell } from "@/components/modules/comms/CommsShell";
@@ -5,6 +6,7 @@ import { getConversations } from "@/app/(app)/comms/actions";
 import { getClients } from "@/app/(app)/tasks/actions";
 
 export default async function CommsPage() {
+  await connection();
   const [initialConversations, initialClients] = await Promise.all([
     getConversations().catch(() => []),
     getClients().catch(() => []),

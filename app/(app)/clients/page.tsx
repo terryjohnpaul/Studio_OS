@@ -1,9 +1,11 @@
+import { connection } from "next/server";
 import { Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ClientsShell } from "@/components/modules/clients/ClientsShell";
 import { getClientStats } from "@/app/(app)/clients/actions";
 
 export default async function ClientsPage() {
+  await connection();
   const initialClients = await getClientStats().catch(() => []);
 
   return (
